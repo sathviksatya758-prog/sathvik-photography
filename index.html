@@ -858,7 +858,15 @@ const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 // Points at the real server/ backend (see server/README or docs/DEPLOYMENT.md).
 // Override by setting window.API_BASE_URL before this script runs, e.g. for
 // staging/production builds served from a different origin than the API.
-const API_BASE=(window.API_BASE_URL||'http://localhost:4000')+'/api';
+// Talk to the API on the SAME hostname the page was loaded from (port 4000),
+// rather than a hardcoded localhost. This keeps the page and the API same-site
+// no matter how the site is opened — 127.0.0.1:5500, localhost:5500, or a LAN
+// IP — so the SameSite=Lax auth/CSRF cookies are actually sent. A hardcoded
+// http://localhost:4000 while the page is served from http://127.0.0.1 is
+// cross-SITE (127.0.0.1 ≠ localhost), and the browser then withholds those
+// cookies, which surfaces as a spurious "Invalid or missing CSRF token".
+// An explicit window.API_BASE_URL still wins (production behind one origin).
+const API_BASE=(window.API_BASE_URL||(location.protocol==='http:'||location.protocol==='https:'?location.protocol+'//'+location.hostname+':4000':'http://localhost:4000'))+'/api';
 // exhibition.js's own AI module only uses this for the "Ask AI" semantic
 // search button (AI.semanticSearch), which was rewritten to call the real
 // /api/search endpoint — never the generic Claude passthrough. See that

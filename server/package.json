@@ -19,7 +19,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "admin:reset-link": "tsx scripts/reset-link.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

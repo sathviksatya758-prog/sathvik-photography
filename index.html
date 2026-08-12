@@ -364,6 +364,7 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
 .err{padding:.55rem .8rem;background:var(--accent-tint);border:1px solid var(--accent-border);
   border-radius:6px;color:var(--accent);font-size:.8rem;margin-bottom:.6rem;display:none}
 .err.show{display:block}
+.err.ok{background:var(--status-good-tint,rgba(52,168,83,.12));border-color:var(--status-good,#34a853);color:var(--status-good,#2e7d46)}
 .submit{width:100%;padding:.9rem;background:var(--ink);color:var(--paper);border-radius:8px;
   font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;
   margin-top:.5rem;transition:background .3s}
@@ -803,14 +804,15 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
       <h3 id="auth-h">Step inside the archive.</h3>
       <p class="sub" id="auth-sub">Enter your credentials to continue.</p>
       <div class="err" id="auth-err"></div>
-      <div class="fld"><input type="email" id="a-email" placeholder="Email" autocomplete="email"/></div>
+      <div class="fld" id="a-email-fld"><input type="email" id="a-email" placeholder="Email" autocomplete="email"/></div>
       <div class="fld" id="a-user-fld" hidden><input type="text" id="a-user" placeholder="Username"/></div>
-      <div class="fld"><input type="password" id="a-pw" placeholder="Password"/></div>
+      <div class="fld" id="a-pw-fld"><input type="password" id="a-pw" placeholder="Password"/></div>
       <div id="a-meter" hidden>
         <div class="pwbars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="pwlab" id="a-pwlab">Weak</div>
       </div>
       <button class="submit" id="a-submit" data-cursor>Sign in →</button>
+      <button class="swap" id="a-forgot" data-cursor>Forgot password?</button>
       <button class="swap" id="a-swap" data-cursor>New here? Create an account</button>
       <div class="sec-note">PBKDF2-SHA256 · 100k iterations · per-user salt</div>
     </div>
@@ -1200,7 +1202,7 @@ function strength(pw){let s=0;
   if(pw.length>=8)s++;if(pw.length>=12)s++;if(/[A-Z]/.test(pw))s++;
   if(/[a-z]/.test(pw))s++;if(/\d/.test(pw))s++;if(/[^A-Za-z0-9]/.test(pw))s++;return s}
 $('#a-pw').addEventListener('input',()=>{
-  if(state.authMode!=='signup')return;
+  if(state.authMode!=='signup'&&state.authMode!=='reset')return;
   const s=strength($('#a-pw').value);
   const labels=['Too weak','Too weak','Weak','Fair','Good','Strong','Excellent'];
   const cols=[null,'var(--status-weak)','var(--status-weak)','var(--status-fair)','var(--status-fair)',
@@ -1209,29 +1211,59 @@ $('#a-pw').addEventListener('input',()=>{
   $('#a-pwlab').textContent=(labels[s]||'Excellent')+' password';
   $('#a-pwlab').style.color=cols[s]||'var(--status-good)';
 });
+// Four modes share one card: login, signup, forgot (request a reset link) and
+// reset (set a new password from an emailed ?reset=<token> link). Each entry
+// declares which fields show and the copy to use.
+const AUTH_MODES={
+  login:  {k:'— Welcome back', h:'Step inside the archive.', sub:'Enter your credentials to continue.', quote:'"Light writes. I only hold the paper."', email:1, user:0, pw:1, meter:0, submit:'Sign in →', swap:'New here? Create an account', forgot:1},
+  signup: {k:'— Create account', h:'Join the archive.', sub:'A private space for returning viewers.', quote:'"Every archive begins with one frame."', email:1, user:1, pw:1, meter:1, submit:'Create account →', swap:'Already registered? Sign in', forgot:0},
+  forgot: {k:'— Reset password', h:'Forgot your password?', sub:"Enter your email and we'll send a reset link.", quote:'"Every archive begins with one frame."', email:1, user:0, pw:0, meter:0, submit:'Send reset link →', swap:'Back to sign in', forgot:0},
+  reset:  {k:'— Reset password', h:'Set a new password.', sub:'Choose a strong password for your account.', quote:'"Light writes. I only hold the paper."', email:0, user:0, pw:1, meter:1, submit:'Update password →', swap:'Back to sign in', forgot:0}
+};
 function authMode(m){
-  state.authMode=m;const up=m==='signup';
-  $('#auth-k').textContent=up?'— Create account':'— Welcome back';
-  $('#auth-h').textContent=up?'Join the archive.':'Step inside the archive.';
-  $('#auth-sub').textContent=up?'A private space for returning viewers.':'Enter your credentials to continue.';
-  $('#auth-quote').textContent=up?'"Every archive begins with one frame."':'"Light writes. I only hold the paper."';
-  $('#a-user-fld').hidden=!up;$('#a-meter').hidden=!up;
-  $('#a-submit').textContent=up?'Create account →':'Sign in →';
-  $('#a-swap').textContent=up?'Already registered? Sign in':'New here? Create an account';
-  $('#auth-err').classList.remove('show');
+  state.authMode=m;const cfg=AUTH_MODES[m]||AUTH_MODES.login;
+  $('#auth-k').textContent=cfg.k;
+  $('#auth-h').textContent=cfg.h;
+  $('#auth-sub').textContent=cfg.sub;
+  $('#auth-quote').textContent=cfg.quote;
+  $('#a-email-fld').hidden=!cfg.email;$('#a-user-fld').hidden=!cfg.user;
+  $('#a-pw-fld').hidden=!cfg.pw;$('#a-meter').hidden=!cfg.meter;
+  $('#a-submit').textContent=cfg.submit;
+  $('#a-swap').textContent=cfg.swap;
+  $('#a-forgot').hidden=!cfg.forgot;
+  $('#auth-err').classList.remove('show','ok');
 }
 function openAuth(m){authMode(m||'login');$('#auth').classList.add('open');
-  setTimeout(()=>$('#a-email').focus(),250)}
-function closeAuth(){$('#auth').classList.remove('open')}
+  setTimeout(()=>{const f=state.authMode==='reset'?$('#a-pw'):$('#a-email');f&&f.focus()},250)}
+function closeAuth(){$('#auth').classList.remove('open');state.resetToken=null}
+// login <-> signup; from forgot/reset "Back to sign in" returns to login.
 $('#a-swap').onclick=()=>authMode(state.authMode==='login'?'signup':'login');
-function authErr(m){const e=$('#auth-err');e.textContent=m;e.classList.add('show')}
+$('#a-forgot').onclick=()=>authMode('forgot');
+function authErr(m){const e=$('#auth-err');e.textContent=m;e.classList.remove('ok');e.classList.add('show')}
+function authOk(m){const e=$('#auth-err');e.textContent=m;e.classList.add('ok','show')}
 $('#a-submit').onclick=async()=>{
-  $('#auth-err').classList.remove('show');
+  $('#auth-err').classList.remove('show','ok');
   const email=$('#a-email').value.trim().toLowerCase(),pw=$('#a-pw').value;
-  if(!EMAIL.test(email))return authErr('Enter a valid email address.');
+  const mode=state.authMode;
+  if(mode!=='reset'&&!EMAIL.test(email))return authErr('Enter a valid email address.');
   const btn=$('#a-submit');btn.disabled=true;
   try{
-    if(state.authMode==='signup'){
+    if(mode==='forgot'){
+      try{
+        await api('/auth/forgot-password',{method:'POST',body:{email}});
+        // Always neutral — never reveal whether an account exists.
+        authOk('If an account exists for that email, a reset link is on its way.');
+      }catch(err){ return authErr(err.message||'Could not send reset link.') }
+      $('#a-email').value='';
+    }else if(mode==='reset'){
+      if(pw.length<8)return authErr('Password must be at least 8 characters.');
+      if(strength(pw)<4)return authErr('Password too weak. Mix cases, numbers and symbols.');
+      try{
+        await api('/auth/reset-password',{method:'POST',body:{token:state.resetToken,password:pw}});
+        state.resetToken=null;toast('Password updated — please sign in.');authMode('login');
+      }catch(err){ return authErr(err.message||'Reset link is invalid or has expired.') }
+      $('#a-pw').value='';
+    }else if(mode==='signup'){
       const u=$('#a-user').value.trim();
       if(!/^[a-zA-Z0-9_.\-]{3,20}$/.test(u))return authErr('Username: 3–20 chars, letters, numbers, . _ -');
       if(pw.length<8)return authErr('Password must be at least 8 characters.');
@@ -2012,8 +2044,18 @@ async function renderSharedGallery(slug){
   initHomepageSections();
   // Deep link: a client arriving at ?gallery=<slug> lands straight on
   // their shared gallery rather than the portfolio home.
-  const sharedSlug=new URLSearchParams(location.search).get('gallery');
+  const params=new URLSearchParams(location.search);
+  const sharedSlug=params.get('gallery');
   if(sharedSlug)renderSharedGallery(sharedSlug);
+  // Deep link: an emailed password-reset link (?reset=<token>) opens the auth
+  // card straight into "set a new password" mode.
+  const resetToken=params.get('reset');
+  if(resetToken){
+    state.resetToken=resetToken;
+    openAuth('reset');
+    // Drop the token from the address bar so it isn't left in history/shares.
+    history.replaceState(null,'',location.pathname+location.hash);
+  }
 })();
 </script>
 </body>

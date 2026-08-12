@@ -95,18 +95,18 @@ async function buildRails(photoId: string): Promise<{ rails: Rail[] }> {
   const [semantic, palette, nearby, sameCamera, sameLens, sameCategory, sameMood, sharedTags, recent] =
     await Promise.all([
     prisma
-      .$queryRawUnsafe<{ photo_id: string; score: number }[]>(`SELECT * FROM similar_photos($1::uuid, $2)`, photoId, 40)
+      .$queryRawUnsafe<{ photo_id: string; score: number }[]>(`SELECT * FROM similar_photos($1::uuid, $2::int)`, photoId, 40)
       .catch(() => []),
     prisma
       .$queryRawUnsafe<{ photo_id: string; score: number }[]>(
-        `SELECT * FROM similar_by_palette($1::uuid, $2)`,
+        `SELECT * FROM similar_by_palette($1::uuid, $2::int)`,
         photoId,
         30
       )
       .catch(() => []),
     prisma
       .$queryRawUnsafe<{ photo_id: string; distance_km: number }[]>(
-        `SELECT * FROM nearby_photos($1::uuid, $2, $3)`,
+        `SELECT * FROM nearby_photos($1::uuid, $2::real, $3::int)`,
         photoId,
         50,
         RAIL_SIZE

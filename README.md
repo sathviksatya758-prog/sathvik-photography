@@ -15,20 +15,32 @@ docs/DEPLOYMENT.md                          How the two are wired together + hos
 
 ## Quickstart
 
+The only hard dependency is a Postgres database with `pgvector`. Redis, S3, the
+AI keys and SMTP are all optional — without them the app falls back to local
+disk storage, an in-memory cache with inline image processing, non-AI metadata,
+and console-logged email, so you can run the whole stack against nothing but a
+connection string. A free cloud Postgres (Neon/Supabase) has pgvector built in.
+
 ```bash
 cd server
 npm install
-cp .env.example .env
-docker compose up -d           # postgres (pgvector) + redis + minio + maildev
-npx prisma migrate deploy
-npm run dev                    # API on :4000
-npm run worker                 # separate terminal — background image processing
+cp .env.example .env            # then set DATABASE_URL (everything else optional)
+npx prisma generate
+npx prisma migrate deploy       # schema + pgvector functions/indexes
+npm run dev                     # API on :4000
 ```
 
-Then open `index.html` in a browser (or serve the repo root as static files).
-It talks to `http://localhost:4000` by default — see
-[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for pointing it elsewhere in
-production. Full backend details: [`server/README.md`](server/README.md).
+Then serve the repo root over http (cookies don't work from `file://`):
+
+```bash
+npx serve -l 8080 .             # open http://localhost:8080
+```
+
+Sign up with the owner email to get the admin account. Step-by-step Windows
+setup (including free cloud Postgres and turning AI/Redis/S3 on later):
+[`docs/RUN_ON_WINDOWS.md`](docs/RUN_ON_WINDOWS.md). With Redis configured, also
+run `npm run worker` for out-of-process image processing. Full backend details:
+[`server/README.md`](server/README.md).
 
 ## Frontend
 

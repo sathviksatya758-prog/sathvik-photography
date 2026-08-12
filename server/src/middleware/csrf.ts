@@ -14,8 +14,10 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // cookies set for this origin. Runs on every request so a token always
 // exists; only enforced (compared) on state-changing methods.
 export function ensureCsrfCookie(req: Request, res: Response, next: NextFunction) {
-  if (!req.cookies?.[COOKIE_NAME]) {
-    res.cookie(COOKIE_NAME, generateToken(24), {
+  let token = req.cookies?.[COOKIE_NAME] as string | undefined;
+  if (!token) {
+    token = generateToken(24);
+    res.cookie(COOKIE_NAME, token, {
       httpOnly: false,
       secure: env.COOKIE_SECURE,
       sameSite: 'lax',
@@ -23,6 +25,11 @@ export function ensureCsrfCookie(req: Request, res: Response, next: NextFunction
       path: '/'
     });
   }
+  // Expose the effective token so a handler (GET /auth/csrf) can hand it back
+  // in the response body — this lets the frontend obtain the token on its very
+  // first call, even before any cookie has been read, and use it directly as
+  // the X-CSRF-Token header (still matching the cookie the browser sends).
+  res.locals.csrfToken = token;
   next();
 }
 

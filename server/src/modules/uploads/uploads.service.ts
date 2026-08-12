@@ -3,7 +3,7 @@ import { AppError } from '../../lib/errors';
 import { putObject } from '../../lib/storage';
 import { readExif, extractPalette, quickPreview } from '../../lib/imagePipeline';
 import { uniqueSlug } from '../../utils/slug';
-import { imageQueue } from '../../lib/queue';
+import { enqueueImageJob } from '../../lib/queue';
 import { cacheDel } from '../../lib/redis';
 import { recordAudit } from '../admin/audit.service';
 import { withMediaPublic, groupTerms } from '../../lib/media';
@@ -75,7 +75,7 @@ export async function startUpload(
     return created;
   });
 
-  await imageQueue.add('process', { photoId: photo.id, storageKey, mime: file.mimetype, bytes: file.size, ownerNote });
+  await enqueueImageJob({ photoId: photo.id, storageKey, mime: file.mimetype, bytes: file.size, ownerNote });
   await recordAudit({ actorId, action: 'photo.upload', targetType: 'photo', targetId: photo.id });
   await cacheDel('photos:list:*');
 
@@ -100,7 +100,7 @@ export async function retryUpload(photoId: string, actorId: string): Promise<voi
   if (photo.status !== 'FAILED') throw AppError.badRequest('Only failed photos can be retried');
 
   await prisma.photo.update({ where: { id: photoId }, data: { status: 'PROCESSING' } });
-  await imageQueue.add('process', { photoId, storageKey: photo.storageKey, mime: photo.mime ?? 'image/jpeg', bytes: Number(photo.bytes ?? 0) });
+  await enqueueImageJob({ photoId, storageKey: photo.storageKey, mime: photo.mime ?? 'image/jpeg', bytes: Number(photo.bytes ?? 0) });
   await recordAudit({ actorId, action: 'photo.retry', targetType: 'photo', targetId: photoId });
   await cacheDel('photos:list:*');
 }

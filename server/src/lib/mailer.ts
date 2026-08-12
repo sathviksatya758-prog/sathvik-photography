@@ -1,17 +1,27 @@
 import nodemailer from 'nodemailer';
-import { env, isProd } from '../config/env';
+import { env, isProd, caps } from '../config/env';
 import { logger } from './logger';
 
-// SMTP is provider-agnostic on purpose — point it at SES, SendGrid, Resend,
-// Mailtrap, MailDev, or a Gmail app password in dev. See .env.example.
-const transport = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: env.SMTP_SECURE,
-  auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined
-});
+// SMTP is provider-agnostic and optional. When SMTP_HOST is configured, point
+// it at SES, SendGrid, Resend, Mailtrap, MailDev, or a Gmail app password (see
+// .env.example). When it isn't, mail is not sent — the message (including any
+// verification/reset link) is logged instead so local flows still work.
+const transport = caps.smtp
+  ? nodemailer.createTransport({
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      secure: env.SMTP_SECURE,
+      auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined
+    })
+  : null;
 
 export async function sendMail(opts: { to: string; subject: string; html: string; text: string }): Promise<void> {
+  if (!transport) {
+    // No SMTP configured: log the message so links (email verification,
+    // password reset) are recoverable from the server console in dev.
+    logger.info({ to: opts.to, subject: opts.subject, text: opts.text }, 'sendMail skipped (SMTP not configured) — logging instead');
+    return;
+  }
   try {
     await transport.sendMail({ from: env.MAIL_FROM, ...opts });
   } catch (err) {

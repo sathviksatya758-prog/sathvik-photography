@@ -22,7 +22,7 @@ async function runSearch(query: string, k: number) {
   const [vector] = await embed(query);
 
   const rows = await prisma.$queryRawUnsafe<SearchRow[]>(
-    `SELECT * FROM search_photos($1::vector, $2, $3)`,
+    `SELECT * FROM search_photos($1::vector, $2, $3::int)`,
     toVectorLiteral(vector),
     query,
     k
@@ -56,7 +56,7 @@ async function runSearch(query: string, k: number) {
 
 export async function similarPhotos(photoId: string, k = 6) {
   const rows = await prisma.$queryRawUnsafe<{ photo_id: string; score: number }[]>(
-    `SELECT * FROM similar_photos($1::uuid, $2)`,
+    `SELECT * FROM similar_photos($1::uuid, $2::int)`,
     photoId,
     k
   );

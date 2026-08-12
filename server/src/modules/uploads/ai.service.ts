@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { anthropic, MODEL, extractText, parseJsonReply } from '../../lib/anthropic';
+import { caps } from '../../config/env';
 import type { ExifData } from '../../lib/imagePipeline';
 import type { PaletteColor } from '../../lib/imagePipeline';
 
@@ -129,12 +130,66 @@ const ENRICH_FIELDS =
 // metadata for a photo, including AI-estimated composition/scene analysis.
 // Ported from legacy/lib.ts::enrichPhoto and expanded per the AI feature
 // spec (multi-platform captions, composition/quality scoring).
+// Non-AI fallback used when ANTHROPIC_API_KEY isn't configured. It produces
+// a valid, honest-but-plain metadata record from the EXIF/palette we already
+// extracted locally — no invented critique, no fabricated scene analysis — so
+// the whole pipeline (renditions, search index, Discovery rows) still works.
+// The photographer can add a key later and re-run via POST /uploads/:id/retry
+// to get the full AI enrichment.
+function fallbackAiMeta(exif: ExifData | null, palette: Pick<PaletteColor, 'hex' | 'share'>[]): AiMeta {
+  const camera = [exif?.make, exif?.model].filter(Boolean).join(' ').trim();
+  const caption = camera ? `Photograph captured on ${camera}` : 'Untitled photograph';
+  const colourNote = palette.length ? `Dominant colours: ${palette.map(p => p.hex).join(', ')}.` : '';
+  return AiMeta.parse({
+    title: 'Untitled',
+    caption,
+    shortCaption: caption,
+    longCaption: `${caption}. ${colourNote}`.trim(),
+    subject: '',
+    subjects: [],
+    description: `${caption}. ${colourNote}`.trim(),
+    sceneDescription: '',
+    altText: caption,
+    story: '',
+    tags: [],
+    categories: [],
+    collections: [],
+    seoKeywords: [],
+    hashtags: [],
+    mood: '',
+    composition: '',
+    lighting: '',
+    colorAnalysis: colourNote,
+    colorHarmony: '',
+    editingStyle: '',
+    cameraTechnique: '',
+    genre: '',
+    socialCaption: caption,
+    instagramCaption: caption,
+    linkedinCaption: caption,
+    twitterCaption: caption,
+    technicalNote: '',
+    locationGuess: null,
+    sceneClassification: 'unclassified',
+    weatherEstimate: null,
+    timeOfDayEstimate: null,
+    lightingQuality: '',
+    ruleOfThirds: false,
+    symmetryDetected: false,
+    leadingLines: false,
+    compositionScore: 0,
+    qualityScore: 0
+  });
+}
+
 export async function enrichPhoto(
   imageBase64: string,
   mediaType: string,
   exif: ExifData | null,
   palette: Pick<PaletteColor, 'hex' | 'share'>[]
 ): Promise<AiMeta> {
+  if (!caps.anthropic) return fallbackAiMeta(exif, palette);
+
   const context = buildContext(exif, palette);
 
   const msg = await anthropic.messages.create({

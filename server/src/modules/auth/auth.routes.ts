@@ -24,6 +24,13 @@ import {
 
 export const authRouter = Router();
 
+// Bootstrap endpoint for the double-submit CSRF flow: a plain GET that the
+// frontend calls before its first mutating request. The global
+// ensureCsrfCookie middleware sets the csrf_token cookie; this returns the
+// same token in the body so the client can send it as X-CSRF-Token without
+// depending on cookie-read timing. Safe (GET) — not itself CSRF-protected.
+authRouter.get('/csrf', (_req, res) => res.json({ csrfToken: res.locals.csrfToken }));
+
 authRouter.post('/register', authLimiter, validate({ body: registerSchema }), registerHandler);
 authRouter.post('/login', authLimiter, validate({ body: loginSchema }), loginHandler);
 authRouter.post('/logout', logoutHandler);

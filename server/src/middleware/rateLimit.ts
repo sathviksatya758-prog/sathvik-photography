@@ -3,18 +3,22 @@ import { RedisStore } from 'rate-limit-redis';
 import { redis } from '../lib/redis';
 import { AppError } from '../lib/errors';
 
-// Redis-backed so limits hold across multiple app instances, not just
-// per-process memory.
+// Redis-backed when available so limits hold across multiple app instances.
+// Without Redis, express-rate-limit's default in-process memory store is
+// used — correct for a single-instance dev/demo run.
 export function makeLimiter(opts: { windowMs: number; max: number; prefix: string }) {
+  const client = redis; // capture for the sendCommand closure so TS can narrow it
   return rateLimit({
     windowMs: opts.windowMs,
     limit: opts.max,
     standardHeaders: true,
     legacyHeaders: false,
-    store: new RedisStore({
-      prefix: `rl:${opts.prefix}:`,
-      sendCommand: (...args: string[]) => (redis.call as unknown as (...a: string[]) => Promise<never>)(...args)
-    }),
+    store: client
+      ? new RedisStore({
+          prefix: `rl:${opts.prefix}:`,
+          sendCommand: (...args: string[]) => (client.call as unknown as (...a: string[]) => Promise<never>)(...args)
+        })
+      : undefined,
     handler: (_req, _res, next) => next(AppError.tooManyRequests())
   });
 }

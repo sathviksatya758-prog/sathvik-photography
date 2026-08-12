@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { embed, toVectorLiteral } from '../../lib/embeddings';
-import { anthropic, MODEL, extractText } from '../../lib/anthropic';
+import { anthropic, MODEL, extractText, hasAnthropic } from '../../lib/anthropic';
 import { cacheGet, cacheSet } from '../../lib/redis';
 import crypto from 'node:crypto';
 
@@ -33,7 +33,9 @@ export const SYSTEM_PROMPT =
 async function retrieveKnowledge(question: string, k = 6): Promise<KnowledgeRow[]> {
   const [vector] = await embed(question);
   const rows = await prisma.$queryRawUnsafe<KnowledgeRow[]>(
-    `SELECT * FROM retrieve_knowledge($1::vector, $2)`,
+    // $2 cast to int: Prisma binds JS numbers as bigint, which won't match
+    // the function's `k INT` parameter (Postgres won't implicitly narrow).
+    `SELECT * FROM retrieve_knowledge($1::vector, $2::int)`,
     toVectorLiteral(vector),
     k
   );
@@ -77,6 +79,20 @@ function cacheKeyFor(message: string): string {
   return `chat:answer:${crypto.createHash('sha256').update(normalized).digest('hex')}`;
 }
 
+// Used when ANTHROPIC_API_KEY isn't configured: instead of erroring, answer
+// from what we retrieved locally — the live archive stats plus the titles of
+// the most relevant knowledge entries. Honest about being the non-AI mode.
+function fallbackAnswer(liveStats: string, hits: KnowledgeRow[]): string {
+  const parts = [
+    "The AI studio assistant isn't switched on right now, but here's what the archive shows:",
+    liveStats
+  ];
+  if (hits.length) {
+    parts.push('Most relevant entries: ' + hits.map(h => h.title).filter(Boolean).slice(0, 4).join('; ') + '.');
+  }
+  return parts.filter(Boolean).join('\n\n');
+}
+
 async function callClaude(
   history: { role: 'user' | 'assistant'; content: string }[],
   context: string,
@@ -114,12 +130,16 @@ export async function ask(message: string, sessionId: string | undefined, userId
   let answer: string | null = isCacheable ? await cacheGet<string>(cacheKey) : null;
   const fromCache = answer !== null;
   if (!answer) {
-    try {
-      answer = await callClaude(history, context, message);
-    } catch {
-      throw AppError.badGateway('The studio assistant is unavailable right now — try again shortly.');
+    if (!hasAnthropic) {
+      answer = fallbackAnswer(liveStats, hits);
+    } else {
+      try {
+        answer = await callClaude(history, context, message);
+      } catch {
+        throw AppError.badGateway('The studio assistant is unavailable right now — try again shortly.');
+      }
+      if (isCacheable) await cacheSet(cacheKey, answer, 600); // 10 min — long enough to absorb bursts of the same FAQ
     }
-    if (isCacheable) await cacheSet(cacheKey, answer, 600); // 10 min — long enough to absorb bursts of the same FAQ
   }
 
   const sources = hits.map((h, i) => ({ n: i + 1, title: h.title, kind: h.kind, photoId: h.photo_id }));
@@ -158,21 +178,26 @@ export async function* askStream(
   const sources = hits.map((h, i) => ({ n: i + 1, title: h.title, kind: h.kind, photoId: h.photo_id }));
 
   let full = '';
-  try {
-    const stream = anthropic.messages.stream({
-      model: MODEL,
-      max_tokens: 700,
-      system: SYSTEM_PROMPT,
-      messages: [...history, { role: 'user' as const, content: `Retrieved context:\n\n${context}\n\nVisitor question: ${message}` }]
-    });
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        full += event.delta.text;
-        yield { type: 'delta', data: event.delta.text };
+  if (!hasAnthropic) {
+    full = fallbackAnswer(liveStats, hits);
+    yield { type: 'delta', data: full };
+  } else {
+    try {
+      const stream = anthropic.messages.stream({
+        model: MODEL,
+        max_tokens: 700,
+        system: SYSTEM_PROMPT,
+        messages: [...history, { role: 'user' as const, content: `Retrieved context:\n\n${context}\n\nVisitor question: ${message}` }]
+      });
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+          full += event.delta.text;
+          yield { type: 'delta', data: event.delta.text };
+        }
       }
+    } catch {
+      throw AppError.badGateway('The studio assistant is unavailable right now — try again shortly.');
     }
-  } catch {
-    throw AppError.badGateway('The studio assistant is unavailable right now — try again shortly.');
   }
 
   yield { type: 'sources', data: sources };
@@ -206,7 +231,9 @@ export async function reindexKnowledge(entries: { kind: string; title: string; b
     await tx.$executeRawUnsafe(`DELETE FROM knowledge_chunks WHERE kind <> 'photo'`);
     for (const [i, e] of entries.entries()) {
       await tx.$executeRawUnsafe(
-        `INSERT INTO knowledge_chunks (kind, title, body, embedding, token_len) VALUES ($1, $2, $3, $4::vector, $5)`,
+        // kind is a KnowledgeKind enum column; a bound text param needs an
+        // explicit cast (Postgres won't implicitly coerce $1::text → enum).
+        `INSERT INTO knowledge_chunks (kind, title, body, embedding, token_len) VALUES ($1::"KnowledgeKind", $2, $3, $4::vector, $5)`,
         e.kind,
         e.title,
         e.body,

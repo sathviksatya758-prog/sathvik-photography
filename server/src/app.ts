@@ -4,7 +4,8 @@ import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-import { env } from './config/env';
+import { env, isProd, caps } from './config/env';
+import { LOCAL_STORAGE_ROOT } from './lib/storage';
 import { requestLogger } from './middleware/requestLogger';
 import { ensureCsrfCookie, verifyCsrf } from './middleware/csrf';
 import { apiLimiter } from './middleware/rateLimit';
@@ -37,9 +38,33 @@ export function createApp() {
     })
   );
 
+  // Credentialed requests (the frontend sends cookies) require the exact
+  // page origin to be echoed back — a wildcard is not allowed. A single
+  // hardcoded CLIENT_ORIGIN broke sign-in/sign-up whenever the page was
+  // served from any other local origin (Live Server on :5500, a different
+  // port, or 127.0.0.1 vs localhost), which the browser surfaces only as
+  // an opaque "Failed to fetch". So: allow the configured origin(s), and
+  // in development additionally reflect any localhost/127.0.0.1 origin.
+  const allowedOrigins = new Set([env.CLIENT_ORIGIN, env.API_BASE_URL]);
+  const isLocalOrigin = (origin: string): boolean => {
+    try {
+      const h = new URL(origin).hostname;
+      return h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1';
+    } catch {
+      return false;
+    }
+  };
   app.use(
     cors({
-      origin: env.CLIENT_ORIGIN,
+      origin(origin, cb) {
+        // No Origin header = same-origin, curl, or a mobile app — allow.
+        if (!origin) return cb(null, true);
+        if (allowedOrigins.has(origin)) return cb(null, true);
+        if (!isProd && isLocalOrigin(origin)) return cb(null, true);
+        // Reject without throwing (a thrown error would 500 rather than
+        // cleanly omit the CORS headers).
+        return cb(null, false);
+      },
       credentials: true,
       allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
       exposedHeaders: ['X-Request-Id']
@@ -56,6 +81,28 @@ export function createApp() {
   app.use(apiLimiter);
 
   app.get('/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
+
+  // When no S3 is configured, uploaded originals and renditions live on
+  // local disk (see lib/storage.ts) and are served from here. In production
+  // you'd put a real object store + CDN in front instead; this exists so the
+  // upload pipeline works with zero external storage setup.
+  if (!caps.s3) {
+    app.use(
+      '/media',
+      express.static(LOCAL_STORAGE_ROOT, {
+        immutable: true,
+        maxAge: '1y',
+        fallthrough: false,
+        setHeaders(res, filePath) {
+          // express.static's mime table doesn't know AVIF; originals are
+          // stored extensionless. Set an image content-type so browsers and
+          // caches treat them correctly instead of octet-stream.
+          if (filePath.endsWith('.avif')) res.type('image/avif');
+          else if (!/\.[a-z0-9]+$/i.test(filePath)) res.type('image/jpeg');
+        }
+      })
+    );
+  }
 
   app.use('/api/auth', authRouter);
   app.use('/api/photos', photosRouter);

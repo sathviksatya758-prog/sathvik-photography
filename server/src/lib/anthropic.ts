@@ -1,8 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { env } from '../config/env';
+import { env, caps } from '../config/env';
 
-export const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+// A placeholder key keeps construction from throwing when no key is set; the
+// client is never actually called in that case (callers check `caps.anthropic`
+// or `hasAnthropic` first and fall back to non-AI behaviour).
+export const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY ?? 'not-configured' });
 export const MODEL = env.ANTHROPIC_MODEL;
+export const hasAnthropic = caps.anthropic;
 
 export function extractText(content: Anthropic.Messages.ContentBlock[]): string {
   return content

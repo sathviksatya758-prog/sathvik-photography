@@ -868,14 +868,40 @@ function getCookie(name){
   const m=document.cookie.match(new RegExp('(?:^|; )'+name+'=([^;]*)'));
   return m?decodeURIComponent(m[1]):null;
 }
+// Double-submit CSRF: every mutating request must carry an X-CSRF-Token
+// header matching the csrf_token cookie. On a fresh page load that cookie
+// doesn't exist yet, so we obtain it up front from GET /auth/csrf (which
+// sets the cookie and echoes the token) before the first POST — otherwise
+// signup/sign-in would race ahead of the cookie and be rejected with 403.
+let _csrfToken=null;
+async function ensureCsrf(){
+  _csrfToken=getCookie('csrf_token')||_csrfToken;
+  if(_csrfToken)return _csrfToken;
+  try{
+    const res=await fetch(API_BASE+'/auth/csrf',{method:'GET',credentials:'include'});
+    const data=await res.json().catch(()=>null);
+    _csrfToken=(data&&data.csrfToken)||getCookie('csrf_token');
+  }catch(e){/* surfaced later as a normal network error by the caller */}
+  return _csrfToken;
+}
 class ApiError extends Error{constructor(status,code,message,details){super(message);this.status=status;this.code=code;this.details=details}}
 async function api(path,opts){
   const method=(opts&&opts.method||'GET').toUpperCase();
   const headers=Object.assign({},opts&&opts.headers);
   let body=opts&&opts.body;
   if(body&&!(body instanceof FormData)){headers['Content-Type']='application/json';body=JSON.stringify(body)}
-  if(method!=='GET'&&method!=='HEAD'){const csrf=getCookie('csrf_token');if(csrf)headers['X-CSRF-Token']=csrf}
-  const res=await fetch(API_BASE+path,{method,headers,body,credentials:'include'});
+  if(method!=='GET'&&method!=='HEAD'){const csrf=await ensureCsrf();if(csrf)headers['X-CSRF-Token']=csrf}
+  let res;
+  try{
+    res=await fetch(API_BASE+path,{method,headers,body,credentials:'include'});
+  }catch(networkErr){
+    // fetch() only rejects on a network-level failure (server down, wrong
+    // URL, or a blocked cross-origin request) — never on an HTTP error
+    // status. Turn the browser's opaque "Failed to fetch" into something
+    // that actually points at the cause.
+    throw new ApiError(0,'NETWORK',
+      "Couldn't reach the server at "+API_BASE+". Make sure the backend is running and that you're opening the site over http (not the file:// path).");
+  }
   if(res.status===204)return null;
   const data=await res.json().catch(()=>null);
   if(!res.ok){const e=(data&&data.error)||{};throw new ApiError(res.status,e.code||'ERROR',e.message||'Request failed',e.details)}
@@ -1033,12 +1059,13 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');
   handleFiles(Array.from(e.dataTransfer.files))});
 fi.addEventListener('change',e=>{handleFiles(Array.from(e.target.files));e.target.value=''});
 
-function uploadWithProgress(file,onProgress){
+async function uploadWithProgress(file,onProgress){
+  const csrf=await ensureCsrf();
   return new Promise((resolve,reject)=>{
     const xhr=new XMLHttpRequest();
     xhr.open('POST',API_BASE+'/uploads');
     xhr.withCredentials=true;
-    const csrf=getCookie('csrf_token'); if(csrf)xhr.setRequestHeader('X-CSRF-Token',csrf);
+    if(csrf)xhr.setRequestHeader('X-CSRF-Token',csrf);
     xhr.upload.onprogress=e=>{ if(e.lengthComputable)onProgress(e.loaded/e.total) };
     xhr.onload=()=>{
       let data=null; try{data=JSON.parse(xhr.responseText)}catch(e){}
@@ -1308,7 +1335,7 @@ $('#chat-msgs').addEventListener('click',e=>{
 // browsers without ReadableStream, network hiccups, etc).
 async function streamChat(q,onDelta,onSources,onSessionId){
   const headers={'Content-Type':'application/json'};
-  const csrf=getCookie('csrf_token'); if(csrf)headers['X-CSRF-Token']=csrf;
+  const csrf=await ensureCsrf(); if(csrf)headers['X-CSRF-Token']=csrf;
   const res=await fetch(API_BASE+'/chat/stream',{method:'POST',headers,credentials:'include',
     body:JSON.stringify({message:q,sessionId:state.chatSessionId})});
   if(!res.ok||!res.body)throw new Error('stream unavailable');

@@ -1,11 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+// Runs synchronously, before any CSS paints, so the correct theme is
+// present from the very first frame — no flash of the wrong theme.
+// Priority: explicit past choice (localStorage) > OS preference > light.
+(function(){
+  try{
+    var saved=localStorage.getItem('theme');
+    var theme=saved==='dark'||saved==='light'?saved
+      :(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+    document.documentElement.setAttribute('data-theme',theme);
+  }catch(e){document.documentElement.setAttribute('data-theme','light');}
+})();
+</script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Katnam Sathvik — Photographer, Visakhapatnam</title>
 <meta name="description" content="Photography by Katnam Sathvik — an archive of nature, monuments, wildlife and people, made on film in Visakhapatnam, India."/>
-<meta name="theme-color" content="#f5f1ea"/>
+<meta name="theme-color" content="#f5f1ea" id="meta-theme-color"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -13,59 +26,147 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
+  /* ---- theme-aware tokens: swap per data-theme, see overrides below ---- */
   --paper:#f5f1ea;--paper-2:#ebe5d8;--ink:#161513;--ink-2:#3a3733;
   --mute:#6b665e;--rule:#d8d2c2;--accent:#c1361f;
+  --shadow:rgba(22,21,19,.3);--overlay:rgba(22,21,19,.94);
+  --selection-bg:#161513;--selection-fg:#f5f1ea;
+  --scrollbar-thumb:#c7c0ac;--scrollbar-track:#ebe5d8;
+  --input-placeholder:#8a8578;--glass-tint:rgba(255,255,255,.4);
+  /* Accent tints follow --accent's own per-theme hue (193,54,31 is
+     #c1361f; the dark-theme block below uses 226,88,47 = #e2582f) so
+     washes/borders never go stale against a re-tuned accent colour. */
+  --accent-tint-weak:rgba(193,54,31,.05);--accent-tint:rgba(193,54,31,.08);
+  --accent-tint-strong:rgba(193,54,31,.16);--accent-border:rgba(193,54,31,.3);
+  --status-weak:#c1361f;--status-fair:#c89344;--status-good:#5a8a5b;
+
+  /* ---- fixed tokens: same literal value in both themes on purpose ----
+     Used only where a fixed dark "accent band" (contact/footer/chat
+     launcher/modal ribbon) or a mix-blend-mode contrast trick (header
+     over the hero photo) depends on a constant, not the page's current
+     surface colour. See exhibition.css for the --xp- equivalents. */
+  --paper-fixed:#f5f1ea;--ink-fixed:#161513;
+
   --serif:'Fraunces',Georgia,serif;--sans:'Inter',system-ui,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,monospace;
   --ease:cubic-bezier(.16,1,.3,1);
+  --theme-dur:.32s;
 }
-html{scroll-behavior:smooth}
+:root[data-theme="dark"]{
+  --paper:#171410;--paper-2:#221e17;--ink:#f3eee3;--ink-2:#d8d0c0;
+  --mute:#9a9284;--rule:#3c362b;--accent:#e2582f;
+  --shadow:rgba(0,0,0,.55);--overlay:rgba(8,7,5,.94);
+  --selection-bg:#f3eee3;--selection-fg:#171410;
+  --scrollbar-thumb:#4a4436;--scrollbar-track:#221e17;
+  --input-placeholder:#726b5c;--glass-tint:rgba(255,255,255,.06);
+  --accent-tint-weak:rgba(226,88,47,.08);--accent-tint:rgba(226,88,47,.12);
+  --accent-tint-strong:rgba(226,88,47,.22);--accent-border:rgba(226,88,47,.4);
+  --status-weak:#e2582f;--status-fair:#d9a75a;--status-good:#72a873;
+}
+@media(prefers-color-scheme:dark){
+  /* Fallback only for the (rare) case JS never ran — the inline script
+     in <head> normally sets data-theme before first paint. */
+  :root:not([data-theme]){
+    --paper:#171410;--paper-2:#221e17;--ink:#f3eee3;--ink-2:#d8d0c0;
+    --mute:#9a9284;--rule:#3c362b;--accent:#e2582f;
+    --shadow:rgba(0,0,0,.55);--overlay:rgba(8,7,5,.94);
+    --selection-bg:#f3eee3;--selection-fg:#171410;
+    --scrollbar-thumb:#4a4436;--scrollbar-track:#221e17;
+    --input-placeholder:#726b5c;--glass-tint:rgba(255,255,255,.06);
+    --accent-tint-weak:rgba(226,88,47,.08);--accent-tint:rgba(226,88,47,.12);
+    --accent-tint-strong:rgba(226,88,47,.22);--accent-border:rgba(226,88,47,.4);
+    --status-weak:#e2582f;--status-fair:#d9a75a;--status-good:#72a873;
+  }
+}
+html{scroll-behavior:smooth;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track)}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);
-  overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  transition:background-color var(--theme-dur) ease,color var(--theme-dur) ease}
 button,a,input,textarea,select{font-family:inherit;color:inherit;background:none;border:none;outline:none}
 a,button,[role="button"]{cursor:pointer}
 img{display:block;max-width:100%;-webkit-user-drag:none}
 em,i{font-style:italic}
 h1,h2,h3{font-weight:400}
+::selection{background:var(--selection-bg);color:var(--selection-fg)}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:var(--scrollbar-track)}
+::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border-radius:8px;
+  border:3px solid var(--scrollbar-track)}
+::placeholder{color:var(--input-placeholder)}
+/* Smooth theme switch: a low-specificity fallback so any element without
+   its own transition still animates colour changes; elements that already
+   declare a transition (buttons, chips, etc) keep using their own — this
+   rule never overrides a more specific one, it only fills the gaps. */
+*{transition:background-color var(--theme-dur) ease,color var(--theme-dur) ease,
+  border-color var(--theme-dur) ease,box-shadow var(--theme-dur) ease}
+/* prefers-reduced-motion is already handled site-wide further down (the
+   *,*::before,*::after transition-duration:.01ms!important block) —
+   it applies here too since !important always wins regardless of order. */
 
-#intro{position:fixed;inset:0;z-index:10000;background:var(--ink);display:flex;
+/* #intro is a fixed dark splash regardless of theme — same reasoning as
+   the header below: it's a brand moment, not page chrome. */
+#intro{position:fixed;inset:0;z-index:10000;background:var(--ink-fixed);display:flex;
   align-items:center;justify-content:center;flex-direction:column;gap:22px}
 #intro.done{pointer-events:none;animation:introOut 1.1s cubic-bezier(.76,0,.24,1) forwards}
 @keyframes introOut{to{clip-path:inset(100% 0 0 0)}}
-.intro-num{font-family:var(--mono);color:var(--paper);font-size:.68rem;letter-spacing:.3em;
+.intro-num{font-family:var(--mono);color:var(--paper-fixed);font-size:.68rem;letter-spacing:.3em;
   text-transform:uppercase;opacity:.5}
-.intro-pct{font-family:var(--serif);font-size:clamp(4rem,12vw,9rem);color:var(--paper);
+.intro-pct{font-family:var(--serif);font-size:clamp(4rem,12vw,9rem);color:var(--paper-fixed);
   font-weight:300;line-height:1;letter-spacing:-.04em;font-variation-settings:"opsz" 144}
-.intro-name{font-family:var(--serif);font-style:italic;color:var(--paper);font-size:1.1rem;opacity:.55}
+.intro-name{font-family:var(--serif);font-style:italic;color:var(--paper-fixed);font-size:1.1rem;opacity:.55}
 
 .wrap{max-width:1440px;margin:0 auto;padding:0 clamp(1.25rem,3vw,2.5rem)}
+/* The header floats over the animated hero photo and relies on
+   mix-blend-mode:difference against a CONSTANT light source colour to
+   stay legible over arbitrary image content — this only works if that
+   source colour never changes, so everything in it uses --*-fixed
+   rather than the theme-swapped --paper/--ink. header.solid (scrolled
+   past the hero, or on the dark .contact page) drops the blend mode but
+   still sits on fixed-dark chrome, so the same fixed colours still apply. */
 header{position:fixed;top:0;left:0;right:0;z-index:50;padding:1.4rem 0;mix-blend-mode:difference}
 header.solid{mix-blend-mode:normal}
 .nav-inner{max-width:1440px;margin:0 auto;padding:0 clamp(1.25rem,3vw,2.5rem);
   display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
 .brand{display:flex;flex-direction:column;line-height:1.1}
-.brand-name{font-family:var(--serif);font-style:italic;font-size:1.15rem;font-weight:500;color:var(--paper)}
-.brand-meta{font-family:var(--mono);font-size:.6rem;color:var(--paper);opacity:.6;
+.brand-name{font-family:var(--serif);font-style:italic;font-size:1.15rem;font-weight:500;color:var(--paper-fixed)}
+.brand-meta{font-family:var(--mono);font-size:.6rem;color:var(--paper-fixed);opacity:.6;
   letter-spacing:.18em;text-transform:uppercase;margin-top:2px}
 .nav-links{display:flex;align-items:center}
-.nav-link{position:relative;padding:.4rem 0;margin:0 .75rem;font-size:.76rem;color:var(--paper);
+.nav-link{position:relative;padding:.4rem 0;margin:0 .75rem;font-size:.76rem;color:var(--paper-fixed);
   letter-spacing:.08em;text-transform:uppercase;font-weight:500;display:flex;flex-direction:column}
 .nav-link .n{font-family:var(--mono);font-size:.54rem;opacity:.5}
 .nav-link::after{content:'';position:absolute;left:0;bottom:0;width:0;height:1px;
-  background:var(--paper);transition:width .4s var(--ease)}
+  background:var(--paper-fixed);transition:width .4s var(--ease)}
 .nav-link:hover::after,.nav-link.active::after{width:100%}
+.nav-right-group{display:flex;align-items:center;gap:.75rem}
 .nav-right{display:flex;align-items:center;gap:.5rem}
+.theme-toggle{position:relative;width:38px;height:38px;flex-shrink:0;border-radius:50%;
+  border:1px solid rgba(245,241,234,.35);color:var(--paper-fixed);
+  transition:background .3s,color .3s,border-color .3s}
+.theme-toggle:hover{background:var(--paper-fixed);color:var(--ink-fixed)}
+.theme-toggle svg{position:absolute;top:50%;left:50%;
+  transition:opacity .35s ease,transform .45s var(--ease)}
+.theme-toggle .ti-sun{transform:translate(-50%,-50%) rotate(0deg) scale(1);opacity:1}
+.theme-toggle .ti-moon{transform:translate(-50%,-50%) rotate(-70deg) scale(.4);opacity:0}
+:root[data-theme="dark"] .theme-toggle .ti-sun{transform:translate(-50%,-50%) rotate(70deg) scale(.4);opacity:0}
+:root[data-theme="dark"] .theme-toggle .ti-moon{transform:translate(-50%,-50%) rotate(0deg) scale(1);opacity:1}
+/* The base reset below sets outline:none on every interactive element;
+   exhibition.css restores it for its own .xp- components but the base
+   page (nav, buttons, form fields, this toggle) had no visible keyboard
+   focus state at all. Restored here, sitewide. */
+:is(button,a,input,textarea,select,[tabindex]):focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px}
 .btn-ghost{padding:.48rem 1rem;border:1px solid rgba(245,241,234,.35);border-radius:30px;
-  color:var(--paper);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--paper-fixed);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
   font-weight:500;transition:background .3s,color .3s}
-.btn-ghost:hover{background:var(--paper);color:var(--ink)}
-.btn-solid{padding:.48rem 1rem;background:var(--paper);color:var(--ink);border-radius:30px;
+.btn-ghost:hover{background:var(--paper-fixed);color:var(--ink-fixed)}
+.btn-solid{padding:.48rem 1rem;background:var(--paper-fixed);color:var(--ink-fixed);border-radius:30px;
   font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;font-weight:500;
   transition:background .3s,color .3s}
-.btn-solid:hover{background:var(--accent);color:var(--paper)}
+.btn-solid:hover{background:var(--accent);color:var(--paper-fixed)}
 .user-chip{display:flex;align-items:center;gap:.5rem;padding:.35rem .7rem .35rem .4rem;
-  border:1px solid rgba(245,241,234,.35);border-radius:30px;color:var(--paper);font-size:.74rem}
-.user-chip .av{width:23px;height:23px;border-radius:50%;background:var(--paper);color:var(--ink);
+  border:1px solid rgba(245,241,234,.35);border-radius:30px;color:var(--paper-fixed);font-size:.74rem}
+.user-chip .av{width:23px;height:23px;border-radius:50%;background:var(--paper-fixed);color:var(--ink-fixed);
   display:flex;align-items:center;justify-content:center;font-family:var(--serif);
   font-style:italic;font-size:.82rem}
 .user-chip .tag{font-family:var(--mono);font-size:.52rem;letter-spacing:.14em;
@@ -73,6 +174,8 @@ header.solid{mix-blend-mode:normal}
   border-radius:10px;padding:1px 5px}
 
 .page{display:none}.page.active{display:block}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 .hero{padding:clamp(8rem,14vw,11rem) 0 clamp(2rem,5vw,4rem)}
 .hero-meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem;
@@ -107,7 +210,7 @@ header.solid{mix-blend-mode:normal}
 .feature-wrap img{width:100%;height:100%;object-fit:cover}
 .feature-cap{position:absolute;left:1.4rem;right:1.4rem;bottom:1.4rem;display:flex;
   justify-content:space-between;font-family:var(--mono);font-size:.62rem;letter-spacing:.2em;
-  text-transform:uppercase;color:var(--paper);mix-blend-mode:difference}
+  text-transform:uppercase;color:var(--paper-fixed);mix-blend-mode:difference}
 
 .section{padding:clamp(3.5rem,7vw,6rem) 0}
 .section-label{display:flex;align-items:center;gap:1rem;margin-bottom:2.5rem;
@@ -115,6 +218,30 @@ header.solid{mix-blend-mode:normal}
   color:var(--mute)}
 .section-label::before{content:'';width:38px;height:1px;background:var(--ink)}
 .section-label b{color:var(--accent);font-weight:500}
+
+/* ---- AI-curated collection strip (homepage) ---- */
+.coll-strip{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr))}
+.coll-card{position:relative;aspect-ratio:3/4;border-radius:6px;overflow:hidden;
+  background:var(--paper-2);cursor:pointer;border:none;padding:0;text-align:left;display:block}
+.coll-card img{width:100%;height:100%;object-fit:cover;
+  transition:transform .9s var(--ease),filter .5s ease}
+.coll-card:hover img{transform:scale(1.06)}
+.coll-card::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(to top,rgba(22,21,19,.88) 8%,rgba(22,21,19,.15) 55%,transparent)}
+.coll-meta{position:absolute;left:0;right:0;bottom:0;padding:1.1rem;z-index:1;color:var(--paper-fixed)}
+.coll-title{font-family:var(--serif);font-style:italic;font-size:1.15rem;line-height:1.2}
+.coll-sub{font-family:var(--mono);font-size:.55rem;letter-spacing:.18em;text-transform:uppercase;
+  opacity:.75;margin-top:.3rem}
+.coll-card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* ---- Animated statistics band ---- */
+.stats-band{border-top:1px solid var(--rule)}
+.stats-grid{display:grid;gap:2rem;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  text-align:center}
+.stat-v{font-family:var(--serif);font-size:clamp(2rem,5vw,3.4rem);font-weight:300;
+  line-height:1;letter-spacing:-.03em;font-variation-settings:"opsz" 144;color:var(--ink)}
+.stat-k{font-family:var(--mono);font-size:.58rem;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--mute);margin-top:.6rem}
 
 .manifesto{padding:clamp(4.5rem,9vw,8rem) 0;text-align:center;
   border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
@@ -141,9 +268,13 @@ header.solid{mix-blend-mode:normal}
   color:var(--mute);margin-bottom:.25rem}
 .fact-v{font-family:var(--serif);font-style:italic;font-size:1.02rem;line-height:1.3}
 
+.upload-gate{display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  margin-top:1.6rem;padding:.9rem 1.1rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--accent-tint-weak);font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;
+  color:var(--ink-2)}
 .upload-zone{border:1px dashed var(--rule);border-radius:12px;padding:clamp(2rem,5vw,3.5rem);
   text-align:center;background:var(--paper-2);transition:border-color .3s,background .3s}
-.upload-zone.drag,.upload-zone:hover{border-color:var(--accent);background:rgba(193,54,31,.05)}
+.upload-zone.drag,.upload-zone:hover{border-color:var(--accent);background:var(--accent-tint-weak)}
 .upload-zone .ico{width:46px;height:46px;border-radius:50%;background:var(--ink);color:var(--paper);
   display:inline-flex;align-items:center;justify-content:center;margin-bottom:.9rem}
 .upload-zone h3{font-family:var(--serif);font-style:italic;font-size:1.4rem;margin-bottom:.25rem}
@@ -151,7 +282,7 @@ header.solid{mix-blend-mode:normal}
   text-transform:uppercase;color:var(--mute)}
 .queue{margin-top:1.6rem;display:flex;flex-direction:column;gap:.6rem}
 .queue-row{display:flex;align-items:center;gap:1rem;padding:.7rem .9rem;border:1px solid var(--rule);
-  border-radius:8px;background:rgba(255,255,255,.4)}
+  border-radius:8px;background:var(--glass-tint)}
 .queue-row img{width:52px;height:52px;object-fit:cover;border-radius:4px;flex-shrink:0}
 .queue-row .meta{flex:1;min-width:0}
 .queue-row .t{font-family:var(--serif);font-style:italic;font-size:.95rem;
@@ -165,7 +296,10 @@ header.solid{mix-blend-mode:normal}
   transition:background .3s,color .3s,border-color .3s}
 .rm:hover{background:var(--accent);color:var(--paper);border-color:var(--accent)}
 
-.contact{padding:clamp(4.5rem,9vw,8rem) 0;background:var(--ink);color:var(--paper)}
+/* The contact/footer band is a deliberate dark closing statement in the
+   current design — kept fixed-dark in both themes rather than inverting
+   to a light band in dark mode, same reasoning as the header/#intro. */
+.contact{padding:clamp(4.5rem,9vw,8rem) 0;background:var(--ink-fixed);color:var(--paper-fixed)}
 .contact-grid{display:grid;gap:3rem;align-items:end}
 @media(min-width:900px){.contact-grid{grid-template-columns:1.5fr 1fr;gap:4.5rem}}
 .contact h2{font-family:var(--serif);font-size:clamp(2.4rem,7.5vw,6.5rem);line-height:.93;
@@ -175,17 +309,17 @@ header.solid{mix-blend-mode:normal}
   line-height:2.1;opacity:.85}
 .c-list .k{display:block;font-size:.54rem;opacity:.5;letter-spacing:.25em;margin-top:.9rem}
 .c-list .v{font-family:var(--serif);font-style:italic;font-size:1.05rem;letter-spacing:0;
-  text-transform:none;color:var(--paper)}
+  text-transform:none;color:var(--paper-fixed)}
 .cta{display:inline-flex;align-items:center;gap:1rem;margin-top:2.2rem;padding:1.1rem 1.9rem;
-  background:var(--paper);color:var(--ink);border-radius:50px;font-family:var(--mono);
+  background:var(--paper-fixed);color:var(--ink-fixed);border-radius:50px;font-family:var(--mono);
   font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;font-weight:500;
   text-decoration:none;transition:transform .4s var(--ease)}
 .cta:hover{transform:scale(1.04)}
-.cta .arw{width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--paper);
+.cta .arw{width:32px;height:32px;border-radius:50%;background:var(--ink-fixed);color:var(--paper-fixed);
   display:inline-flex;align-items:center;justify-content:center;transition:transform .4s}
 .cta:hover .arw{transform:rotate(-45deg)}
 
-footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
+footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
   border-top:1px solid rgba(245,241,234,.1)}
 .foot{max-width:1440px;margin:0 auto;padding:0 clamp(1.25rem,3vw,2.5rem);display:flex;
   flex-direction:column;gap:.8rem}
@@ -193,14 +327,14 @@ footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
 .foot .sig{font-family:var(--serif);font-style:italic;font-size:.88rem;opacity:.85}
 .foot p{font-family:var(--mono);font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;opacity:.5}
 
-.ovl{display:none;position:fixed;inset:0;z-index:9500;background:rgba(22,21,19,.94);
+.ovl{display:none;position:fixed;inset:0;z-index:9500;background:var(--overlay);
   align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(8px)}
 .ovl.open{display:flex}
 .card{background:var(--paper);border-radius:14px;width:100%;max-width:430px;position:relative;
   overflow:hidden;animation:zin .4s var(--ease)}
 @keyframes zin{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
-.card-hero{height:120px;position:relative;background:var(--ink);display:flex;align-items:flex-end;padding:1.2rem}
-.card-hero span{position:relative;font-family:var(--serif);font-style:italic;color:var(--paper);
+.card-hero{height:120px;position:relative;background:var(--ink-fixed);display:flex;align-items:flex-end;padding:1.2rem}
+.card-hero span{position:relative;font-family:var(--serif);font-style:italic;color:var(--paper-fixed);
   font-size:1.15rem;font-weight:300}
 .card-body{padding:1.6rem 1.8rem 1.8rem}
 .card-body .k{font-family:var(--mono);font-size:.58rem;letter-spacing:.25em;text-transform:uppercase;
@@ -208,14 +342,25 @@ footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
 .card-body h3{font-family:var(--serif);font-style:italic;font-size:1.7rem;line-height:1.1;margin-bottom:.35rem}
 .card-body .sub{font-size:.85rem;color:var(--mute);margin-bottom:1.2rem}
 .fld{margin-bottom:.6rem}
-.fld input{width:100%;padding:.8rem .95rem;border:1px solid var(--rule);border-radius:8px;
-  background:var(--paper-2);font-size:.9rem;transition:border-color .3s}
-.fld input:focus{border-color:var(--ink)}
+.fld input,.fld textarea{width:100%;padding:.8rem .95rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--paper-2);font-size:.9rem;transition:border-color .3s;resize:vertical}
+.fld input:focus,.fld textarea:focus{border-color:var(--ink)}
+.contact-form{margin-top:2.2rem;max-width:420px}
+.contact-form .fld input,.contact-form .fld textarea{background:rgba(245,241,234,.06);
+  border-color:rgba(245,241,234,.2);color:var(--paper-fixed)}
+.contact-form .fld input::placeholder,.contact-form .fld textarea::placeholder{color:rgba(245,241,234,.45)}
+.contact-form .fld input:focus,.contact-form .fld textarea:focus{border-color:var(--paper-fixed)}
+.contact-form .submit{background:var(--paper-fixed);color:var(--ink-fixed)}
+.contact-form .submit:hover{background:var(--accent);color:var(--paper-fixed)}
+.contact-form .err{background:var(--accent-tint-strong)}
+.contact-note{font-family:var(--mono);font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;
+  color:rgba(245,241,234,.5);margin-top:1rem;display:none}
+.contact-note.show{display:block}
 .pwbars{display:flex;gap:3px;margin-top:.35rem}
 .pwbars i{flex:1;height:2px;background:var(--rule);transition:background .3s}
 .pwlab{font-family:var(--mono);font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;
   color:var(--mute);margin-top:.3rem}
-.err{padding:.55rem .8rem;background:rgba(193,54,31,.08);border:1px solid rgba(193,54,31,.3);
+.err{padding:.55rem .8rem;background:var(--accent-tint);border:1px solid var(--accent-border);
   border-radius:6px;color:var(--accent);font-size:.8rem;margin-bottom:.6rem;display:none}
 .err.show{display:block}
 .submit{width:100%;padding:.9rem;background:var(--ink);color:var(--paper);border-radius:8px;
@@ -237,36 +382,196 @@ footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
 .c-keep{background:var(--paper-2);border:1px solid var(--rule)}
 .c-yes{background:var(--accent);color:var(--paper)}
 
+/* Toast + chat launcher/header/self-bubble stay fixed-dark "brand chip"
+   accents in both themes (same idea as the contact band) — only the chat
+   panel's own body/input area (below) adapts to the page theme. */
 #toast{position:fixed;top:5rem;left:50%;transform:translateX(-50%) translateY(-120px);z-index:9800;
-  background:var(--ink);color:var(--paper);padding:.8rem 1.3rem;border-radius:30px;
+  background:var(--ink-fixed);color:var(--paper-fixed);padding:.8rem 1.3rem;border-radius:30px;
   font-family:var(--mono);font-size:.66rem;letter-spacing:.15em;text-transform:uppercase;
   transition:transform .5s var(--ease);display:flex;align-items:center;gap:.5rem}
 #toast.show{transform:translateX(-50%) translateY(0)}
 #toast .d{width:6px;height:6px;border-radius:50%;background:var(--accent)}
 
 #chat-btn{position:fixed;bottom:1.4rem;right:1.4rem;z-index:70;width:52px;height:52px;
-  border-radius:50%;background:var(--ink);color:var(--paper);display:flex;align-items:center;
-  justify-content:center;box-shadow:0 8px 28px rgba(22,21,19,.3);transition:transform .3s,background .3s}
+  border-radius:50%;background:var(--ink-fixed);color:var(--paper-fixed);display:flex;align-items:center;
+  justify-content:center;box-shadow:0 8px 28px var(--shadow);transition:transform .3s,background .3s}
 #chat-btn:hover{transform:scale(1.08);background:var(--accent)}
 #chat{display:none;position:fixed;bottom:5.2rem;right:1.4rem;z-index:70;
   width:min(390px,calc(100vw - 2.4rem));height:min(500px,calc(100vh - 8rem));
   background:var(--paper);border:1px solid var(--rule);border-radius:14px;
-  box-shadow:0 22px 60px rgba(22,21,19,.35);flex-direction:column;overflow:hidden}
+  box-shadow:0 22px 60px var(--shadow);flex-direction:column;overflow:hidden}
 #chat.open{display:flex}
-.chat-head{padding:.85rem 1.05rem;background:var(--ink);color:var(--paper);display:flex;
+.chat-head{padding:.85rem 1.05rem;background:var(--ink-fixed);color:var(--paper-fixed);display:flex;
   justify-content:space-between;align-items:center}
 .chat-head .t{font-family:var(--serif);font-style:italic;font-size:.98rem}
 .chat-head .s{font-family:var(--mono);font-size:.53rem;letter-spacing:.2em;
   text-transform:uppercase;opacity:.6;margin-top:2px}
 .chat-msgs{flex:1;overflow-y:auto;padding:.9rem;display:flex;flex-direction:column;gap:.55rem}
 .msg{padding:.6rem .8rem;border-radius:12px;font-size:.86rem;line-height:1.55;max-width:88%}
-.msg.user{background:var(--ink);color:var(--paper);align-self:flex-end}
+.msg.user{background:var(--ink-fixed);color:var(--paper-fixed);align-self:flex-end}
 .msg.assistant{background:var(--paper-2);align-self:flex-start}
 .chat-in{padding:.65rem;border-top:1px solid var(--rule);display:flex;gap:.4rem;background:var(--paper-2)}
 .chat-in input{flex:1;padding:.55rem .8rem;background:var(--paper);border:1px solid var(--rule);
   border-radius:6px;font-size:.85rem}
-.chat-in button{padding:.55rem .9rem;background:var(--ink);color:var(--paper);border-radius:6px;
+.chat-in button{padding:.55rem .9rem;background:var(--ink-fixed);color:var(--paper-fixed);border-radius:6px;
   font-family:var(--mono);font-size:.6rem;letter-spacing:.15em;text-transform:uppercase}
+
+/* ============================================================
+   Map / Dashboard / Galleries / Shared-gallery screens
+   All colours are theme tokens so both light & dark work. Charts
+   are single-hue magnitude bars in the site accent (dataviz: one
+   series → one hue, value direct-labelled).
+   ============================================================ */
+.nav-admin .n{color:var(--accent)}
+
+/* ---- shared bits ---- */
+.dash-empty,.map-loading,.dash-loading,.gal-loading,.shared-loading{
+  font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;color:var(--mute);padding:1.4rem 0}
+.dash-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:2rem}
+.btn-refresh,.btn-solid.gal-new-btn{padding:.5rem 1.1rem;border:1px solid var(--rule);border-radius:30px;
+  font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);
+  background:transparent;transition:background .3s,color .3s,border-color .3s}
+.btn-refresh:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* ---- Map ---- */
+.map-head{display:flex;justify-content:space-between;align-items:flex-end;gap:1.5rem;flex-wrap:wrap;margin-bottom:1.4rem}
+.map-lede{font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--ink-2);max-width:44ch;line-height:1.5}
+.map-controls{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--rule);border-radius:30px;overflow:hidden}
+.seg-btn{padding:.42rem .9rem;background:transparent;color:var(--ink-2);font-family:var(--mono);font-size:.58rem;
+  letter-spacing:.12em;text-transform:uppercase;transition:background .3s,color .3s}
+.seg-btn.on{background:var(--ink);color:var(--paper)}
+.map-toggle{padding:.42rem .9rem;border:1px solid var(--rule);border-radius:30px;background:transparent;
+  color:var(--ink-2);font-family:var(--mono);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;
+  transition:background .3s,color .3s,border-color .3s}
+.map-toggle.on{background:var(--accent);color:var(--paper-fixed);border-color:var(--accent)}
+.map-years{font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);
+  display:flex;align-items:center;gap:.4rem}
+.map-years select{border:1px solid var(--rule);border-radius:6px;padding:.3rem .4rem;background:var(--paper-2);
+  color:var(--ink);font-family:var(--mono);font-size:.62rem}
+.map-canvas{position:relative;border:1px solid var(--rule);border-radius:8px;overflow:hidden;
+  background:var(--paper-2);aspect-ratio:2/1;max-height:70vh}
+.map-canvas svg{width:100%;height:100%;display:block}
+.graticule line{stroke:var(--rule);stroke-width:.3;opacity:.7}
+.graticule .equator{stroke:var(--mute);stroke-width:.4;opacity:.6}
+.heat{display:none}
+.heat circle{fill:var(--accent)}
+.map-canvas.heat-on .heat{display:block}
+.marker{fill:var(--accent);stroke:var(--paper-fixed);stroke-width:.5;cursor:pointer;
+  transition:fill .2s,r .2s;opacity:.9}
+.marker:hover,.marker:focus-visible{fill:var(--ink);outline:none}
+.marker:focus-visible{stroke:var(--accent);stroke-width:1}
+.map-panel{margin-top:1.4rem;border:1px solid var(--rule);border-radius:8px;padding:1.2rem;background:var(--paper-2)}
+.map-panel-head{display:flex;align-items:baseline;gap:1rem;margin-bottom:1rem}
+.map-panel-head h3{font-family:var(--serif);font-style:italic;font-size:1.3rem}
+.map-panel-head span{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.map-panel-x{margin-left:auto;font-size:1.4rem;color:var(--mute);line-height:1}
+.map-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.5rem}
+.map-thumb{aspect-ratio:1;border-radius:4px;overflow:hidden;cursor:pointer;background:var(--paper)}
+.map-thumb img{width:100%;height:100%;object-fit:cover;transition:transform .5s var(--ease)}
+.map-thumb:hover img{transform:scale(1.08)}
+.map-thumb:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---- Dashboard ---- */
+.dash-narrative{font-family:var(--serif);font-style:italic;font-size:1.25rem;line-height:1.55;color:var(--ink-2);
+  max-width:60ch;margin-bottom:2.4rem;padding-left:1rem;border-left:2px solid var(--accent)}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:2.5rem}
+.kpi{border:1px solid var(--rule);border-radius:8px;padding:1.3rem 1.2rem;background:var(--paper-2)}
+.kpi-v{font-family:var(--serif);font-size:clamp(1.6rem,4vw,2.4rem);font-weight:300;line-height:1;
+  letter-spacing:-.02em;color:var(--ink)}
+.kpi-k{font-family:var(--mono);font-size:.56rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mute);margin-top:.6rem}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:1.2rem}
+.dash-card{border:1px solid var(--rule);border-radius:8px;padding:1.3rem;background:var(--paper-2)}
+.dash-card.dash-wide{grid-column:1/-1}
+.dash-card h3{font-family:var(--mono);font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--mute);margin-bottom:1.1rem}
+.bars{display:flex;flex-direction:column;gap:.55rem}
+.bar-row{display:grid;grid-template-columns:minmax(72px,34%) 1fr auto;align-items:center;gap:.7rem}
+.bar-label{font-family:var(--sans);font-size:.78rem;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{height:9px;background:var(--rule);border-radius:5px;overflow:hidden}
+.bar-fill{display:block;height:100%;background:var(--accent);border-radius:5px;transition:width .5s var(--ease)}
+.bar-val{font-family:var(--mono);font-size:.62rem;color:var(--ink);min-width:2ch;text-align:right}
+.color-trends{display:flex;height:44px;border-radius:6px;overflow:hidden;gap:2px}
+.color-chip{flex:1 1 0;min-width:6px}
+.lead-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.7rem}
+.lead-item{position:relative;aspect-ratio:4/3;border-radius:5px;overflow:hidden;cursor:pointer;background:var(--paper)}
+.lead-item img{width:100%;height:100%;object-fit:cover}
+.lead-count{position:absolute;left:.4rem;bottom:.4rem;padding:.15rem .45rem;border-radius:12px;
+  background:var(--ink-fixed);color:var(--paper-fixed);font-family:var(--mono);font-size:.5rem;letter-spacing:.1em}
+.lead-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dash-foot{font-family:var(--mono);font-size:.54rem;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--mute);margin-top:2.2rem;text-align:right}
+
+/* ---- Galleries management ---- */
+.gal-create{border:1px solid var(--rule);border-radius:8px;padding:1.3rem;background:var(--paper-2);margin-bottom:1.8rem;max-width:520px}
+.gal-create-row{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin-top:.4rem}
+.gal-create-row select{border:1px solid var(--rule);border-radius:8px;padding:.6rem .7rem;background:var(--paper);color:var(--ink);font-size:.85rem}
+.gal-check{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.6rem;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.gal-list{display:flex;flex-direction:column;gap:1rem}
+.gal-card{border:1px solid var(--rule);border-radius:8px;padding:1.2rem 1.3rem;background:var(--paper-2)}
+.gal-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
+.gal-card h3{font-family:var(--serif);font-style:italic;font-size:1.35rem;line-height:1.2}
+.gal-meta{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.5rem;
+  font-family:var(--mono);font-size:.56rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.gal-badge{padding:.15rem .5rem;border-radius:12px;border:1px solid var(--rule)}
+.gal-badge.live{border-color:var(--accent);color:var(--accent)}
+.gal-badge.warn{border-color:var(--mute)}
+.gal-actions{display:flex;gap:.4rem;flex-wrap:wrap}
+.gal-desc{font-size:.9rem;color:var(--ink-2);margin-top:.8rem;max-width:60ch;line-height:1.5}
+.gal-share,.gal-picker{margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid var(--rule)}
+.share-url{display:flex;gap:.5rem;margin-bottom:1rem}
+.share-url input{flex:1;border:1px solid var(--rule);border-radius:6px;padding:.55rem .7rem;background:var(--paper);
+  color:var(--ink);font-family:var(--mono);font-size:.72rem}
+.share-opts{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.9rem}
+.share-opts .fld span{display:block;font-family:var(--mono);font-size:.54rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--mute);margin-bottom:.3rem}
+.share-opts input{width:100%;border:1px solid var(--rule);border-radius:6px;padding:.55rem .7rem;
+  background:var(--paper);color:var(--ink);font-size:.85rem}
+.share-toggles{display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem}
+.share-actions{display:flex;gap:.6rem;align-items:center}
+.picker-hint{font-family:var(--mono);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:.8rem}
+.picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:.4rem;max-height:340px;overflow-y:auto;padding:.2rem}
+.picker-item{position:relative;aspect-ratio:1;border-radius:4px;overflow:hidden;cursor:pointer;background:var(--paper);opacity:.85}
+.picker-item img{width:100%;height:100%;object-fit:cover}
+.picker-item .picker-check{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(193,54,31,.55);color:#fff;font-size:1.2rem;opacity:0;transition:opacity .2s}
+.picker-item[aria-pressed="true"]{opacity:1;outline:2px solid var(--accent);outline-offset:-2px}
+.picker-item[aria-pressed="true"] .picker-check{opacity:1}
+.picker-actions{margin-top:1rem}
+
+/* ---- Public shared gallery ---- */
+.shared-head{margin-bottom:2.5rem;max-width:70ch}
+.shared-head h1{font-family:var(--serif);font-size:clamp(2rem,6vw,3.6rem);font-weight:300;line-height:1.02;
+  letter-spacing:-.03em;margin:.6rem 0}
+.shared-desc{font-family:var(--serif);font-style:italic;font-size:1.15rem;color:var(--ink-2);line-height:1.5;max-width:52ch}
+.shared-count{font-family:var(--mono);font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin-top:1rem}
+.shared-grid{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))}
+.shared-item{position:relative;margin:0}
+.shared-open{display:block;width:100%;aspect-ratio:4/5;border-radius:5px;overflow:hidden;cursor:pointer;background:var(--paper-2)}
+.shared-open img{width:100%;height:100%;object-fit:cover;transition:transform .8s var(--ease)}
+.shared-open:hover img{transform:scale(1.05)}
+.shared-open:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.shared-wm{position:absolute;right:.6rem;bottom:.6rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--paper-fixed);opacity:.7;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}
+.shared-dl{display:inline-block;margin-top:.4rem;font-family:var(--mono);font-size:.54rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--mute);text-decoration:none;border-bottom:1px solid var(--rule)}
+.shared-dl:hover{color:var(--accent);border-color:var(--accent)}
+.shared-lock,.shared-msg{max-width:440px;margin:0 auto;text-align:center}
+.shared-lock h1,.shared-msg h1{font-family:var(--serif);font-size:clamp(1.6rem,4vw,2.4rem);font-weight:300;margin:.8rem 0 1rem}
+.shared-lock p,.shared-msg p{color:var(--mute);font-size:.92rem;margin-bottom:1.5rem}
+.shared-unlock{text-align:left;margin-top:1.5rem}
+.shared-msg a,.shared-foot a{color:var(--accent)}
+.shared-foot{margin-top:4rem;text-align:center;font-family:var(--mono);font-size:.56rem;letter-spacing:.2em;
+  text-transform:uppercase}
+.shared-foot a{text-decoration:none;color:var(--mute)}
+
+@media(max-width:640px){
+  .dash-top{align-items:flex-start}
+  .bar-row{grid-template-columns:minmax(60px,40%) 1fr auto}
+  .share-opts{grid-template-columns:1fr}
+  .map-controls{width:100%}
+}
 
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
@@ -291,11 +596,30 @@ footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
     </a>
     <nav class="nav-links" aria-label="Primary">
       <a class="nav-link active" data-page="home" href="#" onclick="go('home');return false"><span class="n">01</span>Work</a>
-      <a class="nav-link" id="nav-upload" data-page="upload" href="#" onclick="go('upload');return false"><span class="n">02</span>Upload</a>
-      <a class="nav-link" data-page="about" href="#" onclick="go('about');return false"><span class="n">03</span>About</a>
-      <a class="nav-link" data-page="contact" href="#" onclick="go('contact');return false"><span class="n">04</span>Contact</a>
+      <a class="nav-link" data-page="map" href="#" onclick="go('map');return false"><span class="n">02</span>Map</a>
+      <a class="nav-link" id="nav-upload" data-page="upload" href="#" onclick="go('upload');return false"><span class="n">03</span>Upload</a>
+      <a class="nav-link" data-page="about" href="#" onclick="go('about');return false"><span class="n">04</span>About</a>
+      <a class="nav-link" data-page="contact" href="#" onclick="go('contact');return false"><span class="n">05</span>Contact</a>
+      <!-- Admin-only: shown by updateAdminNav() when signed in as owner. -->
+      <a class="nav-link nav-admin" data-page="dashboard" href="#" onclick="go('dashboard');return false" hidden><span class="n">·</span>Dashboard</a>
+      <a class="nav-link nav-admin" data-page="galleries" href="#" onclick="go('galleries');return false" hidden><span class="n">·</span>Galleries</a>
     </nav>
-    <div class="nav-right" id="nav-right"></div>
+    <div class="nav-right-group">
+      <!-- Lives outside #nav-right on purpose — renderNav() replaces
+           #nav-right's innerHTML wholesale on every auth change, which
+           would otherwise wipe this out. -->
+      <button id="theme-toggle" class="theme-toggle" type="button" data-cursor
+              aria-label="Switch to dark theme" aria-pressed="false">
+        <svg class="ti-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="4.2"/>
+          <path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/>
+        </svg>
+        <svg class="ti-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 14.6A8.6 8.6 0 1 1 9.4 4a7 7 0 0 0 10.6 10.6z"/>
+        </svg>
+      </button>
+      <div class="nav-right" id="nav-right"></div>
+    </div>
   </div>
 </header>
 
@@ -316,16 +640,34 @@ footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
           <div class="hero-stat">Photographs in archive<strong id="count">00</strong></div>
         </div>
         <div class="feature-wrap" data-cursor data-image id="feature">
-          <img id="feature-img" src="" alt="Featured photograph"/>
+          <img id="feature-img" src="" alt="Featured photograph" aria-describedby="feature-desc"/>
+          <p id="feature-desc" class="sr-only"></p>
           <div class="feature-cap"><span id="feature-l">— Featured frame</span><span id="feature-r">N°01</span></div>
         </div>
       </div>
     </div>
 
+    <!-- AI-curated collection strip. Populated from /api/discovery;
+         the whole block stays hidden until it has something to show, so
+         the page is unchanged when the archive service isn't running. -->
+    <div class="section" id="collections-section" hidden>
+      <div class="wrap">
+        <div class="section-label"><b>01 ·</b> Curated by AI</div>
+        <div class="coll-strip" id="collections-strip"></div>
+      </div>
+    </div>
+
     <div class="section">
       <div class="wrap">
-        <div class="section-label"><b>01 ·</b> The archive</div>
+        <div class="section-label"><b>02 ·</b> The archive</div>
         <div id="gallery"></div>
+      </div>
+    </div>
+
+    <!-- Portfolio statistics with count-up animation -->
+    <div class="section stats-band" id="stats-band" hidden>
+      <div class="wrap">
+        <div class="stats-grid" id="stats-grid"></div>
       </div>
     </div>
 
@@ -349,6 +691,10 @@ footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
           max-width:52ch;line-height:1.55">Each upload is read for EXIF, sampled for its colour
           palette, and analysed by AI for caption, story, tags and composition — then it joins the
           archive above.</p>
+        <div class="upload-gate" id="upload-gate" hidden>
+          <span>Owner sign-in required to upload.</span>
+          <button class="btn-solid" id="upload-gate-in" data-cursor>Sign in</button>
+        </div>
         <div style="height:2.5rem"></div>
         <div class="upload-zone" id="dropzone" data-cursor tabindex="0" role="button"
              aria-label="Upload photographs">
@@ -396,6 +742,14 @@ footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
 
   <section id="page-photo" class="page"></section>
 
+  <!-- Populated lazily by JS on first navigation (renderMap/renderDashboard/
+       renderGalleries). Kept empty in markup so nothing loads until asked. -->
+  <section id="page-map" class="page"></section>
+  <section id="page-dashboard" class="page"></section>
+  <section id="page-galleries" class="page"></section>
+  <!-- Public shared-gallery view for ?gallery=<slug> deep links. -->
+  <section id="page-shared" class="page"></section>
+
   <section id="page-contact" class="page">
     <div class="contact">
       <div class="wrap">
@@ -416,6 +770,16 @@ footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
                 stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/>
                 <polyline points="7 7 17 7 17 17"/></svg></span>
             </a>
+            <form class="contact-form" id="contact-form">
+              <div class="err" id="cn-err"></div>
+              <div class="fld"><input type="text" id="cn-name" placeholder="Name" autocomplete="name"/></div>
+              <div class="fld"><input type="email" id="cn-email" placeholder="Email" autocomplete="email"/></div>
+              <div class="fld"><input type="text" id="cn-subject" placeholder="Subject (optional)"/></div>
+              <div class="fld"><textarea id="cn-message" placeholder="Tell me a little about what you have in mind…" rows="4"></textarea></div>
+              <input type="text" id="cn-company" name="company" autocomplete="off" tabindex="-1" hidden/>
+              <button type="submit" class="submit" id="cn-submit" data-cursor>Send message</button>
+              <p class="contact-note" id="cn-note">Sent — I usually reply within 48 hours.</p>
+            </form>
           </div>
         </div>
       </div>
@@ -472,7 +836,7 @@ footer{padding:2.2rem 0;background:var(--ink);color:var(--paper);
 <div id="chat" role="dialog" aria-label="Studio assistant">
   <div class="chat-head">
     <div><div class="t">Studio assistant</div><div class="s">Grounded in the archive</div></div>
-    <button id="chat-x" data-cursor aria-label="Close assistant" style="color:var(--paper)">
+    <button id="chat-x" data-cursor aria-label="Close assistant" style="color:var(--paper-fixed)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
@@ -490,10 +854,67 @@ const $=(s,r)=>(r||document).querySelector(s), $$=(s,r)=>Array.from((r||document
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
   .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-const state={page:'home',photos:[],user:null,authMode:'login',
+/* ---------- backend API ---------- */
+// Points at the real server/ backend (see server/README or docs/DEPLOYMENT.md).
+// Override by setting window.API_BASE_URL before this script runs, e.g. for
+// staging/production builds served from a different origin than the API.
+const API_BASE=(window.API_BASE_URL||'http://localhost:4000')+'/api';
+// exhibition.js's own AI module only uses this for the "Ask AI" semantic
+// search button (AI.semanticSearch), which was rewritten to call the real
+// /api/search endpoint — never the generic Claude passthrough. See that
+// function's comment in exhibition.js for why there's no generic proxy.
+if(window.Exhibition&&Exhibition.config)Exhibition.config.apiBase=API_BASE;
+function getCookie(name){
+  const m=document.cookie.match(new RegExp('(?:^|; )'+name+'=([^;]*)'));
+  return m?decodeURIComponent(m[1]):null;
+}
+class ApiError extends Error{constructor(status,code,message,details){super(message);this.status=status;this.code=code;this.details=details}}
+async function api(path,opts){
+  const method=(opts&&opts.method||'GET').toUpperCase();
+  const headers=Object.assign({},opts&&opts.headers);
+  let body=opts&&opts.body;
+  if(body&&!(body instanceof FormData)){headers['Content-Type']='application/json';body=JSON.stringify(body)}
+  if(method!=='GET'&&method!=='HEAD'){const csrf=getCookie('csrf_token');if(csrf)headers['X-CSRF-Token']=csrf}
+  const res=await fetch(API_BASE+path,{method,headers,body,credentials:'include'});
+  if(res.status===204)return null;
+  const data=await res.json().catch(()=>null);
+  if(!res.ok){const e=(data&&data.error)||{};throw new ApiError(res.status,e.code||'ERROR',e.message||'Request failed',e.details)}
+  return data;
+}
+function trackEvent(type,extra){
+  api('/analytics/event',{method:'POST',body:Object.assign({type,path:location.hash||'/'},extra)}).catch(()=>{});
+}
+
+const state={page:'home',photos:[],user:null,authMode:'login',chatSessionId:null,
   chat:[{role:'assistant',content:"I'm Sathvik's studio assistant. Ask me about a photo in the archive, when he started, or how many he's taken so far."}],
   chatBusy:false,pendingDelete:null};
-const users={};
+
+/* ---------- theme ---------- */
+// The <head> inline script already set data-theme before first paint
+// (no flash of the wrong theme); this just wires up the toggle button
+// and keeps everything in sync afterwards.
+function applyTheme(theme,{persist}={persist:true}){
+  document.documentElement.setAttribute('data-theme',theme);
+  if(persist){try{localStorage.setItem('theme',theme)}catch(e){}}
+  const btn=$('#theme-toggle');
+  const isDark=theme==='dark';
+  btn.setAttribute('aria-pressed',String(isDark));
+  btn.setAttribute('aria-label','Switch to '+(isDark?'light':'dark')+' theme');
+  const meta=$('#meta-theme-color');
+  if(meta)meta.content=isDark?'#171410':'#f5f1ea';
+}
+function currentTheme(){return document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light'}
+applyTheme(currentTheme(),{persist:false}); // sync the toggle's aria state to what <head> already set
+$('#theme-toggle').addEventListener('click',()=>{
+  applyTheme(currentTheme()==='dark'?'light':'dark');
+  trackEvent('theme_change',{theme:currentTheme()});
+});
+// Only auto-follow the OS theme for visitors who've never made an
+// explicit choice — once they pick one, that choice sticks.
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',e=>{
+  let hasChoice=false;try{hasChoice=!!localStorage.getItem('theme')}catch(err){}
+  if(!hasChoice)applyTheme(e.matches?'dark':'light',{persist:false});
+});
 
 /* ---------- intro ---------- */
 (function(){const p=$('#pct'),el=$('#intro');let n=0;
@@ -504,13 +925,29 @@ const users={};
 
 /* ---------- nav ---------- */
 function go(page){
-  if(page==='upload'&&state.user)page='home';
+  // The Upload tab itself is always reachable — the real access control
+  // lives server-side (requireAdmin on POST /api/uploads, see
+  // server/src/middleware/auth.ts), enforced independently of whatever
+  // this tab shows. Hiding the nav item based on a live login session
+  // just meant it looked "gone" whenever the backend wasn't reachable.
+  // Dashboard & Galleries are owner-only. The server enforces this on
+  // every underlying request too (requireAdmin) — this is just so the
+  // page doesn't flash before the API would reject it.
+  if((page==='dashboard'||page==='galleries')&&!isOwner()){
+    toast('Sign in as the archive owner');openAuth('login');return;
+  }
   state.page=page;
   $$('.page').forEach(p=>p.classList.remove('active'));
   const el=$('#page-'+page); if(el) el.classList.add('active');
   $$('.nav-link').forEach(l=>l.classList.toggle('active',l.dataset.page===page));
-  $('#header').classList.toggle('solid',page==='contact');
+  // Pages with their own dark surface want the solid (non-blend) header.
+  $('#header').classList.toggle('solid',page==='contact'||page==='shared');
   scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+  trackEvent('page_view',{path:'/'+page});
+  // Lazy render — each screen builds on first visit and refreshes on return.
+  if(page==='map')renderMap();
+  else if(page==='dashboard')renderDashboard();
+  else if(page==='galleries')renderGalleries();
 }
 /* ---------- toast + progress ---------- */
 function toast(m){$('#toast-msg').textContent=m;const t=$('#toast');
@@ -519,28 +956,72 @@ function progress(p){const b=$('#progress');
   b.style.opacity='1';b.style.width=(p*100)+'%';
   if(p>=1)setTimeout(()=>{b.style.opacity='0';b.style.width='0'},400)}
 
-/* ---------- storage ---------- */
-async function save(){
-  if(!window.storage)return;
-  try{
-    const meta=state.photos.map(p=>({id:p.id,mediaType:p.mediaType,createdAt:p.createdAt,
-      ownerNote:p.ownerNote||'',ai:p.ai,exif:p.exif,palette:p.palette,
-      lqip:p.lqip,aspect:p.aspect,width:p.width,height:p.height}));
-    await window.storage.set('ks_meta',JSON.stringify(meta),true);
-    for(const p of state.photos) if(p.url&&p.url.startsWith('data:'))
-      await window.storage.set('ks_img_'+p.id,p.url,true);
-  }catch(e){}
+/* ---------- backend photo -> legacy exhibition.js shape ---------- */
+// exhibition.js's own client-side ingest pipeline (Exif/Palette modules)
+// produces photo objects shaped like {url, exif:{make,model,lens,focal,
+// aperture,shutter,iso,hasData,...}, palette:{colors:[...]}, ai, lqip,
+// aspect, width, height}. The real backend returns a differently-shaped
+// (and much richer) record — this adapter bridges the two so the
+// masonry/lightbox/SEO code in exhibition.js keeps working untouched.
+const fmtShutter=t=>{if(!t)return null;return t>=1?`${Math.round(t*10)/10}s`:`1/${Math.round(1/t)}s`};
+function adaptExif(x){
+  if(!x)return{hasData:false};
+  const out={
+    make:x.make||null, model:x.model||null, lens:x.lens||null,
+    shutter:fmtShutter(x.shutterSec), aperture:x.aperture?`f/${Math.round(x.aperture*10)/10}`:null,
+    iso:x.iso??null, focal:x.focalMm?`${Math.round(x.focalMm)}mm`:null,
+    focal35:x.focal35mm?`${Math.round(x.focal35mm)}mm`:null,
+    flash:x.flash||null, whiteBalance:x.whiteBalance||null,
+    taken:x.takenAt||null, gps:(x.gpsLat!=null&&x.gpsLon!=null)?{lat:x.gpsLat,lon:x.gpsLon}:null
+  };
+  out.hasData=Object.keys(out).some(k=>k!=='hasData'&&out[k]!=null);
+  return out;
+}
+function adaptPhoto(p){
+  // Largest available rendition (srcset entries are ordered by ascending
+  // width — see server/src/lib/imagePipeline.ts RENDITION_WIDTHS), since
+  // this single .url is used as the full-size image everywhere.
+  const jpegSet=(p.urls&&p.urls.jpeg||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const largest=jpegSet.length?jpegSet[jpegSet.length-1].split(' ')[0]:'';
+  return {
+    id:p.id, slug:p.slug, url:largest||(p.urls&&p.urls.original)||'',
+    // Keep the full responsive set too — `url` above is the 2048px
+    // rendition, which is right for the lightbox/detail hero but far too
+    // heavy for a ~200px gallery tile. Tiles use these srcsets instead.
+    urls:p.urls||null,
+    mediaType:p.mime, createdAt:p.createdAt, ownerNote:p.ownerNote||'',
+    status:p.status, lqip:p.lqip, aspect:p.aspect||0.75, width:p.width, height:p.height,
+    exif:adaptExif(p.exif),
+    palette:{colors:(p.colors||[]).map(c=>({hex:c.hex,r:c.r,g:c.g,b:c.b,share:c.share}))},
+    featured:!!p.featured,
+    ai:p.ai?{caption:p.ai.caption,title:p.ai.title,subject:p.ai.subject,description:p.ai.description,
+      // Screen-reader text prefers the most descriptive field available —
+      // altText is purpose-written for this, but fall back gracefully.
+      altText:p.ai.altText||p.ai.longCaption||p.ai.sceneDescription||p.ai.caption||'Photograph',
+      shortCaption:p.ai.shortCaption,longCaption:p.ai.longCaption,sceneDescription:p.ai.sceneDescription,
+      story:p.ai.story,mood:p.ai.mood,composition:p.ai.composition,
+      lighting:p.ai.lighting,colorAnalysis:p.ai.colorAnalysis,colorHarmony:p.ai.colorHarmony,
+      editingStyle:p.ai.editingStyle,cameraTechnique:p.ai.cameraTechnique,genre:p.ai.genre,
+      socialCaption:p.ai.socialCaption,instagramCaption:p.ai.instagramCaption,
+      linkedinCaption:p.ai.linkedinCaption,twitterCaption:p.ai.twitterCaption,
+      subjects:p.ai.subjects||[],sceneClassification:p.ai.sceneClassification,
+      weatherEstimate:p.ai.weatherEstimate,timeOfDayEstimate:p.ai.timeOfDayEstimate,
+      lightingQuality:p.ai.lightingQuality,ruleOfThirds:p.ai.ruleOfThirds,
+      symmetryDetected:p.ai.symmetryDetected,leadingLines:p.ai.leadingLines,
+      compositionScore:p.ai.compositionScore,qualityScore:p.ai.qualityScore,
+      tags:(p.terms&&p.terms.tags)||[],categories:(p.terms&&p.terms.categories)||[]}:null
+  };
 }
 async function load(){
-  if(!window.storage)return[];
   try{
-    const r=await window.storage.get('ks_meta',true); if(!r)return[];
-    const meta=JSON.parse(r.value),out=[];
-    for(const m of meta){try{const im=await window.storage.get('ks_img_'+m.id,true);
-      if(im)out.push({...m,url:im.value})}catch(e){}}
-    return out;
+    const r=await api('/photos?limit=60');
+    return (r&&r.photos||[]).map(adaptPhoto);
   }catch(e){return[]}
 }
+// Photos persist server-side as part of upload/delete — nothing for the
+// client to write back. Kept as a no-op so Exhibition.init's persist
+// hook has something safe to call.
+async function save(){}
 
 /* ---------- upload ---------- */
 const dz=$('#dropzone'),fi=$('#file-input');
@@ -552,38 +1033,78 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');
   handleFiles(Array.from(e.dataTransfer.files))});
 fi.addEventListener('change',e=>{handleFiles(Array.from(e.target.files));e.target.value=''});
 
+function uploadWithProgress(file,onProgress){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST',API_BASE+'/uploads');
+    xhr.withCredentials=true;
+    const csrf=getCookie('csrf_token'); if(csrf)xhr.setRequestHeader('X-CSRF-Token',csrf);
+    xhr.upload.onprogress=e=>{ if(e.lengthComputable)onProgress(e.loaded/e.total) };
+    xhr.onload=()=>{
+      let data=null; try{data=JSON.parse(xhr.responseText)}catch(e){}
+      if(xhr.status>=200&&xhr.status<300)resolve(data);
+      else reject(new ApiError(xhr.status,(data&&data.error&&data.error.code)||'ERROR',
+        (data&&data.error&&data.error.message)||'Upload failed'));
+    };
+    xhr.onerror=()=>reject(new ApiError(0,'NETWORK','Network error during upload'));
+    const fd=new FormData(); fd.append('file',file);
+    xhr.send(fd);
+  });
+}
+function pollUploadStatus(id,onTick){
+  return new Promise((resolve,reject)=>{
+    let attempts=0;
+    const tick=async()=>{
+      attempts++;
+      try{
+        const {photo}=await api('/uploads/'+id+'/status');
+        onTick(photo);
+        if(photo.status==='READY')return resolve(photo);
+        if(photo.status==='FAILED')return reject(new Error('AI processing failed'));
+        if(attempts>60)return reject(new Error('Timed out waiting for processing'));
+        setTimeout(tick,2500);
+      }catch(err){ reject(err) }
+    };
+    tick();
+  });
+}
 async function handleFiles(files){
+  if(!isOwner()){ toast('Sign in as the archive owner to upload'); openAuth('login'); return }
   for(const f of files.filter(f=>f.type.startsWith('image/'))){
     const row=document.createElement('div');
     row.className='queue-row';
     row.innerHTML=`<img alt=""/><div class="meta"><div class="t">${esc(f.name)}</div>
-      <div class="s" data-stage>Reading file…</div><div class="bar"><i></i></div></div>`;
+      <div class="s" data-stage>Uploading…</div><div class="bar"><i></i></div></div>`;
     $('#queue').prepend(row);
     try{
-      const photo=await Exhibition.ingest(f,{
-        onPhoto:p=>{ $('img',row).src=p.lqip||p.url; },
-        onProgress:(stage,pct)=>{
-          $('[data-stage]',row).textContent={
-            reading:'Reading file…',exif:'Extracting EXIF…',encoded:'Encoding…',
-            placeholder:'Building blur placeholder…',palette:'Sampling colour palette…',
-            analysed:'AI analysis complete',done:'Ready'}[stage]||stage;
-          $('.bar i',row).style.width=(pct*100)+'%';
-          progress(pct);
-        }
-      });
+      const started=await uploadWithProgress(f,pct=>{ $('.bar i',row).style.width=(pct*100)+'%'; progress(pct*0.5) });
+      $('img',row).src=started.lqip||'';
+      $('[data-stage]',row).textContent='Reading EXIF, sampling colour, analysing with AI…';
+      $('.bar i',row).style.width='50%';
+
+      const photo=adaptPhoto({...started, urls:{lqip:started.lqip}, exif:started.exif,
+        colors:(started.palette||[]), ownerNote:'', createdAt:new Date().toISOString()});
       state.photos.unshift(photo);
-      $('img',row).src=photo.lqip||photo.url;
-      $('.t',row).textContent=(photo.ai&&photo.ai.caption)||f.name;
+
+      const finalRecord=await pollUploadStatus(started.id,p=>{
+        $('.bar i',row).style.width=(50+Math.min(p.status==='READY'?50:25,50))+'%';
+      });
+      const finalPhoto=adaptPhoto(finalRecord);
+      const idx=state.photos.findIndex(p=>p.id===finalPhoto.id);
+      if(idx>-1)state.photos[idx]=finalPhoto; else state.photos.unshift(finalPhoto);
+
+      $('img',row).src=finalPhoto.lqip||finalPhoto.url;
+      $('.t',row).textContent=(finalPhoto.ai&&finalPhoto.ai.caption)||f.name;
       $('[data-stage]',row).textContent=[
-        photo.exif&&photo.exif.hasData?'EXIF read':'No EXIF',
-        photo.palette?photo.palette.colors.length+' colours':null,
-        photo.ai&&photo.ai.tags?photo.ai.tags.length+' tags':null
+        finalPhoto.exif&&finalPhoto.exif.hasData?'EXIF read':'No EXIF',
+        finalPhoto.palette?finalPhoto.palette.colors.length+' colours':null,
+        finalPhoto.ai&&finalPhoto.ai.tags?finalPhoto.ai.tags.length+' tags':null
       ].filter(Boolean).join(' · ');
       const rm=document.createElement('button');
       rm.className='rm';rm.textContent='Remove';rm.dataset.cursor='';
-      rm.onclick=()=>askDelete(photo.id);
+      rm.onclick=()=>askDelete(finalPhoto.id);
       row.appendChild(rm);
-      await save();
+      progress(1);
       await Exhibition.refresh();
       refreshHero();
       toast('Frame added to the archive');
@@ -598,10 +1119,11 @@ function askDelete(id){state.pendingDelete=id;$('#confirm').classList.add('open'
 $('#cf-no').onclick=()=>{state.pendingDelete=null;$('#confirm').classList.remove('open')};
 $('#cf-yes').onclick=async()=>{
   const id=state.pendingDelete; if(!id)return;
-  state.photos=state.photos.filter(p=>p.id!==id);
   state.pendingDelete=null;$('#confirm').classList.remove('open');
-  if(window.storage){try{await window.storage.delete('ks_img_'+id,true)}catch(e){}}
-  await save(); await Exhibition.refresh(); refreshHero(); renderQueue();
+  try{ await api('/photos/'+id,{method:'DELETE'}) }
+  catch(err){ toast(err.message||'Could not remove frame'); return }
+  state.photos=state.photos.filter(p=>p.id!==id);
+  await Exhibition.refresh(); refreshHero(); renderQueue();
   toast('Frame removed');
 };
 function renderQueue(){
@@ -626,22 +1148,18 @@ function refreshHero(){
   const p=state.photos[0]; if(!p)return;
   $('#feature-img').src=p.url;
   $('#feature-img').alt=(p.ai&&p.ai.altText)||'Featured photograph';
+  // AI-generated long-form description for screen readers — altText is a
+  // short caption-style description; this is the fuller scene account.
+  $('#feature-desc').textContent=(p.ai&&(p.ai.longCaption||p.ai.sceneDescription))||'';
   $('#feature-l').textContent='— '+((p.ai&&p.ai.caption)||'Latest frame');
   $('#feature-r').textContent='N°01 / '+String(state.photos.length).padStart(2,'0');
   $('#feature').onclick=()=>Exhibition.showDetail(p);
 }
 
 /* ---------- auth ---------- */
+// Passwords are hashed server-side with Argon2 (see server/src/utils/password.ts);
+// nothing sensitive is computed or stored client-side anymore.
 const EMAIL=/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-async function hash(pw,salt){
-  const e=new TextEncoder();
-  const k=await crypto.subtle.importKey('raw',e.encode(pw),'PBKDF2',false,['deriveBits']);
-  const b=await crypto.subtle.deriveBits({name:'PBKDF2',salt:e.encode(salt),
-    iterations:100000,hash:'SHA-256'},k,256);
-  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
-}
-const salt=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)))
-  .map(b=>b.toString(16).padStart(2,'0')).join('');
 function strength(pw){let s=0;
   if(pw.length>=8)s++;if(pw.length>=12)s++;if(/[A-Z]/.test(pw))s++;
   if(/[a-z]/.test(pw))s++;if(/\d/.test(pw))s++;if(/[^A-Za-z0-9]/.test(pw))s++;return s}
@@ -649,10 +1167,11 @@ $('#a-pw').addEventListener('input',()=>{
   if(state.authMode!=='signup')return;
   const s=strength($('#a-pw').value);
   const labels=['Too weak','Too weak','Weak','Fair','Good','Strong','Excellent'];
-  const cols=[null,'#c1361f','#c1361f','#c89344','#c89344','#5a8a5b','#5a8a5b'];
-  $$('.pwbars i').forEach((b,i)=>b.style.background=i<s?(cols[s]||'#5a8a5b'):'var(--rule)');
+  const cols=[null,'var(--status-weak)','var(--status-weak)','var(--status-fair)','var(--status-fair)',
+    'var(--status-good)','var(--status-good)'];
+  $$('.pwbars i').forEach((b,i)=>b.style.background=i<s?(cols[s]||'var(--status-good)'):'var(--rule)');
   $('#a-pwlab').textContent=(labels[s]||'Excellent')+' password';
-  $('#a-pwlab').style.color=cols[s]||'#5a8a5b';
+  $('#a-pwlab').style.color=cols[s]||'var(--status-good)';
 });
 function authMode(m){
   state.authMode=m;const up=m==='signup';
@@ -681,16 +1200,15 @@ $('#a-submit').onclick=async()=>{
       if(!/^[a-zA-Z0-9_.\-]{3,20}$/.test(u))return authErr('Username: 3–20 chars, letters, numbers, . _ -');
       if(pw.length<8)return authErr('Password must be at least 8 characters.');
       if(strength(pw)<4)return authErr('Password too weak. Mix cases, numbers and symbols.');
-      if(users[email])return authErr('Account exists. Sign in instead.');
-      const s=salt();users[email]={email,username:u,salt:s,hash:await hash(pw,s)};
-      state.user={email,username:u};
-      closeAuth();renderNav();toast('Welcome, '+u);
+      try{
+        const {user}=await api('/auth/register',{method:'POST',body:{email,username:u,password:pw}});
+        state.user=user;closeAuth();renderNav();toast('Welcome, '+u);
+      }catch(err){ return authErr(err.message||'Could not create account.') }
     }else{
-      const u=users[email];
-      if(!u)return authErr('No account found. Create one instead?');
-      if(await hash(pw,u.salt)!==u.hash)return authErr('Incorrect password.');
-      state.user={email,username:u.username};
-      closeAuth();renderNav();toast('Welcome back, '+u.username);
+      try{
+        const {user}=await api('/auth/login',{method:'POST',body:{email,password:pw}});
+        state.user=user;closeAuth();renderNav();toast('Welcome back, '+user.username);
+      }catch(err){ return authErr(err.message||'Incorrect email or password.') }
     }
     $('#a-email').value='';$('#a-pw').value='';if($('#a-user'))$('#a-user').value='';
   }finally{btn.disabled=false}
@@ -699,20 +1217,38 @@ $$('#a-email,#a-pw,#a-user').forEach(i=>i&&i.addEventListener('keydown',e=>{
   if(e.key==='Enter')$('#a-submit').click()}));
 $('#auth').addEventListener('click',e=>{if(e.target.id==='auth')closeAuth()});
 
+function isOwner(){return !!(state.user&&state.user.role==='ADMIN')}
+function updateUploadGate(){
+  const gate=$('#upload-gate'), zone=$('#dropzone');
+  gate.hidden=isOwner();
+  zone.setAttribute('aria-disabled',String(!isOwner()));
+}
+function updateAdminNav(){
+  // Reveal the owner-only Dashboard/Galleries tabs; if the owner signs
+  // out while on one, bounce them home so they're not stranded.
+  $$('.nav-admin').forEach(l=>{l.hidden=!isOwner()});
+  if(!isOwner()&&(state.page==='dashboard'||state.page==='galleries'))go('home');
+}
+$('#upload-gate-in').onclick=()=>openAuth('login');
+
 function renderNav(){
   const el=$('#nav-right');
-  $('#nav-upload').style.display=state.user?'none':'';
+  updateUploadGate();
+  updateAdminNav();
   if(state.user){
     el.innerHTML=`<div class="user-chip"><span class="av">${
-      esc(state.user.username[0].toUpperCase())}</span><span>${esc(state.user.username)}</span></div>
+      esc(state.user.username[0].toUpperCase())}</span><span>${esc(state.user.username)}</span>${
+      state.user.role==='ADMIN'?'<span class="tag">Owner</span>':''}</div>
       <button class="btn-ghost" id="logout" data-cursor>Sign out</button>`;
     $('#logout').onclick=()=>{
       $('#cf-h').textContent='Sign out?';
       $('#cf-p').textContent="You'll need to sign in again to return.";
       $('#cf-yes').textContent='Sign out';
       $('#confirm').classList.add('open');
-      $('#cf-yes').onclick=()=>{
-        const n=state.user.username;state.user=null;
+      $('#cf-yes').onclick=async()=>{
+        const n=state.user.username;
+        try{await api('/auth/logout',{method:'POST'})}catch(e){}
+        state.user=null;
         $('#confirm').classList.remove('open');renderNav();toast('Goodbye, '+n);
         $('#cf-h').textContent='Remove this frame?';
         $('#cf-p').textContent='It will leave the archive. This cannot be undone.';
@@ -730,30 +1266,100 @@ function renderNav(){
 
 /* ---------- RAG assistant ---------- */
 const SUGGEST=['What is this photo about?','When did you start photography?','How many photos have you taken so far?','Show me your wildlife work'];
+function citationHtml(body,sources){
+  return esc(body).replace(/\[(\d+)\]/g,(m,n)=>{
+    const s=sources&&sources[Number(n)-1];
+    return s&&s.photoId?`<span class="xp-cite" data-photo-id="${esc(s.photoId)}" role="button" tabindex="0">${n}</span>`
+      :`<span class="xp-cite">${n}</span>`;
+  });
+}
 function renderChat(){
   const c=$('#chat-msgs');
+  const last=state.chat[state.chat.length-1];
+  const streamingDraft=state.chatBusy&&last&&last.role==='assistant'?last:null;
   c.innerHTML=state.chat.map(m=>{
-    const body=esc(m.content).replace(/\[(\d+)\]/g,'<span class="xp-cite">$1</span>');
+    if(m===streamingDraft&&!m.content)
+      return `<div class="msg assistant"><span class="xp-status"><span class="xp-dotpulse"></span>Searching the archive…</span></div>`;
+    const body=citationHtml(m.content,m.sources);
     const src=m.sources&&m.sources.length
       ? `<div class="xp-sources">${m.sources.map((s,i)=>`[${i+1}] ${esc(s.title)}`).join(' · ')}</div>`:'';
     return `<div class="msg ${m.role}">${body}${src}</div>`;
   }).join('');
-  if(state.chatBusy)c.innerHTML+=`<div class="msg assistant"><span class="xp-status">
+  if(state.chatBusy&&!streamingDraft)c.innerHTML+=`<div class="msg assistant"><span class="xp-status">
     <span class="xp-dotpulse"></span>Searching the archive…</span></div>`;
   c.scrollTop=c.scrollHeight;
   $('#chat-suggest').innerHTML=state.chat.length<=1
     ? SUGGEST.map(s=>`<button data-q="${esc(s)}">${esc(s)}</button>`).join(''):'';
   $$('#chat-suggest button').forEach(b=>b.onclick=()=>ask(b.dataset.q));
 }
+// Clicking a citation number jumps to that photograph, if it's one we
+// already have loaded (event-delegated so it survives every re-render).
+$('#chat-msgs').addEventListener('click',e=>{
+  const cite=e.target.closest('.xp-cite[data-photo-id]'); if(!cite)return;
+  const photo=state.photos.find(p=>p.id===cite.dataset.photoId); if(!photo)return;
+  $('#chat').classList.remove('open');
+  go('home');
+  Exhibition.showDetail(photo);
+});
+
+// Reads Server-Sent Event frames ("event: x\ndata: y\n\n") off a fetch
+// response body as they arrive — used for progressive chat rendering.
+// Falls back to the non-streaming endpoint on any failure (older
+// browsers without ReadableStream, network hiccups, etc).
+async function streamChat(q,onDelta,onSources,onSessionId){
+  const headers={'Content-Type':'application/json'};
+  const csrf=getCookie('csrf_token'); if(csrf)headers['X-CSRF-Token']=csrf;
+  const res=await fetch(API_BASE+'/chat/stream',{method:'POST',headers,credentials:'include',
+    body:JSON.stringify({message:q,sessionId:state.chatSessionId})});
+  if(!res.ok||!res.body)throw new Error('stream unavailable');
+  const reader=res.body.getReader(), decoder=new TextDecoder();
+  let buf='';
+  while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    buf+=decoder.decode(value,{stream:true});
+    let idx;
+    while((idx=buf.indexOf('\n\n'))>-1){
+      const frame=buf.slice(0,idx); buf=buf.slice(idx+2);
+      const evMatch=frame.match(/^event: (.+)$/m), dataMatch=frame.match(/^data: (.+)$/m);
+      if(!evMatch||!dataMatch)continue;
+      const ev=evMatch[1], data=JSON.parse(dataMatch[1]);
+      if(ev==='sessionId')onSessionId(data);
+      else if(ev==='delta')onDelta(data);
+      else if(ev==='sources')onSources(data);
+      else if(ev==='error')throw new Error(data.message||'stream error');
+    }
+  }
+}
 async function ask(q){
   if(!q||state.chatBusy)return;
   state.chat.push({role:'user',content:q});
   $('#chat-input').value='';state.chatBusy=true;renderChat();
+  // Real server-side RAG: retrieves over pgvector embeddings and calls
+  // Claude with a scoped, photography-only system prompt (see
+  // server/src/modules/chat/chat.service.ts). Replaces the old
+  // Exhibition.ask() path, which called Anthropic directly from the
+  // browser with no API key and could never actually succeed.
+  const draft={role:'assistant',content:'',sources:[]};
   try{
-    const {text,sources}=await Exhibition.ask(q,state.chat.filter(m=>!m.sources));
-    state.chat.push({role:'assistant',content:text,sources});
+    state.chat.push(draft);
+    renderChat(); // chatBusy stays true throughout — renderChat() shows the
+                   // dot-pulse inside this draft bubble until the first delta lands
+    await streamChat(q,
+      delta=>{draft.content+=delta;renderChat()},
+      sources=>{draft.sources=sources;renderChat()},
+      sessionId=>{state.chatSessionId=sessionId});
+    if(!draft.content)throw new Error('empty stream');
   }catch(e){
-    state.chat.push({role:'assistant',content:'I could not reach the archive just now. Email sathviksatya758@gmail.com and Sathvik will reply directly.'});
+    state.chat.pop();
+    try{
+      const {sessionId,message,sources}=await api('/chat',{method:'POST',
+        body:{message:q,sessionId:state.chatSessionId}});
+      state.chatSessionId=sessionId;
+      state.chat.push({role:'assistant',content:message,sources});
+    }catch(e2){
+      state.chat.push({role:'assistant',content:'I could not reach the archive just now. Email sathviksatya758@gmail.com and Sathvik will reply directly.'});
+    }
   }
   state.chatBusy=false;renderChat();
 }
@@ -763,6 +1369,28 @@ $('#chat-send').onclick=()=>ask($('#chat-input').value.trim());
 $('#chat-input').addEventListener('keydown',e=>{
   if(e.key==='Enter')ask($('#chat-input').value.trim())});
 
+/* ---------- contact form ---------- */
+$('#contact-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const err=$('#cn-err'); err.classList.remove('show'); $('#cn-note').classList.remove('show');
+  const name=$('#cn-name').value.trim(), email=$('#cn-email').value.trim().toLowerCase(),
+    subject=$('#cn-subject').value.trim(), message=$('#cn-message').value.trim(),
+    company=$('#cn-company').value; // honeypot — real visitors never fill this in
+  if(!name){err.textContent='Enter your name.';err.classList.add('show');return}
+  if(!EMAIL.test(email)){err.textContent='Enter a valid email address.';err.classList.add('show');return}
+  if(!message){err.textContent='Say a little about what you have in mind.';err.classList.add('show');return}
+  const btn=$('#cn-submit'); btn.disabled=true;
+  try{
+    await api('/contact',{method:'POST',body:{name,email,subject:subject||undefined,message,company:company||undefined}});
+    $('#contact-form').reset();
+    $('#cn-note').classList.add('show');
+    toast('Message sent');
+  }catch(err2){
+    err.textContent=err2.message||'Could not send — email sathviksatya758@gmail.com directly.';
+    err.classList.add('show');
+  }finally{btn.disabled=false}
+});
+
 /* ---------- scroll header ---------- */
 addEventListener('scroll',()=>{
   $('#header').classList.toggle('solid',state.page==='contact'||scrollY>window.innerHeight*0.9);
@@ -770,8 +1398,568 @@ addEventListener('scroll',()=>{
 addEventListener('keydown',e=>{if(e.key==='Escape'){closeAuth();
   $('#confirm').classList.remove('open');$('#chat').classList.remove('open')}});
 
+/* ---------- homepage: AI collections + animated statistics ---------- */
+// Both blocks stay hidden unless the archive service returns data, so the
+// homepage is byte-identical to before when the backend isn't reachable.
+function countUp(el,target){
+  const dur=1100, start=performance.now();
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduce||target<=0){el.textContent=String(target);return}
+  const tick=now=>{
+    const t=Math.min(1,(now-start)/dur);
+    // easeOutCubic — fast start, gentle settle
+    el.textContent=String(Math.round(target*(1-Math.pow(1-t,3))));
+    if(t<1)requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+function renderCollectionStrip(rows){
+  const strip=$('#collections-strip'), section=$('#collections-section');
+  const curated=rows.filter(r=>r.kind==='collection'&&r.photos.length).slice(0,8);
+  if(!curated.length)return;
+  strip.innerHTML=curated.map(r=>{
+    const cover=r.photos[0];
+    const set=(cover.urls&&cover.urls.jpeg)||'';
+    const src=set.split(',')[0]?set.split(',')[0].trim().split(' ')[0]:(cover.urls&&cover.urls.original)||'';
+    return `<button class="coll-card" data-collection="${esc(r.slug)}"
+      aria-label="Browse the ${esc(r.title)} collection, ${r.total} photograph${r.total===1?'':'s'}">
+      <img src="${esc(cover.lqip||src)}" data-full="${esc(src)}" alt="" loading="lazy"/>
+      <span class="coll-meta">
+        <span class="coll-title">${esc(r.title)}</span>
+        <span class="coll-sub">${r.total} frame${r.total===1?'':'s'}</span>
+      </span></button>`;
+  }).join('');
+  $$('#collections-strip img[data-full]').forEach(im=>{im.src=im.dataset.full});
+  // Clicking a collection drops the visitor into Discovery, scrolled to
+  // that row — the strip is a shortcut into the feed, not a separate page.
+  $$('#collections-strip [data-collection]').forEach(b=>{
+    b.onclick=()=>{
+      Exhibition.setView('discovery');
+      trackEvent('collection_open',{meta:{slug:b.dataset.collection}});
+      setTimeout(()=>{
+        const rail=document.getElementById('rail-'+b.dataset.collection);
+        const target=rail?rail.closest('.xp-rail'):$('#gallery');
+        if(target)target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'start'});
+      },260);
+    };
+  });
+  section.hidden=false;
+}
+function renderStats(feed){
+  const grid=$('#stats-grid'), band=$('#stats-band');
+  const rows=feed.rows||[];
+  const collections=rows.filter(r=>r.kind==='collection').length;
+  const cameras=new Set();
+  state.photos.forEach(p=>{const x=p.exif||{};const c=[x.make,x.model].filter(Boolean).join(' ').trim();if(c)cameras.add(c)});
+  const years=state.photos.map(p=>p.createdAt&&new Date(p.createdAt).getFullYear()).filter(Boolean);
+  const stats=[
+    ['Photographs',feed.totalPhotos||state.photos.length],
+    ['AI collections',collections],
+    ['Cameras used',cameras.size],
+    ['Years shooting',years.length?(new Date().getFullYear()-Math.min.apply(null,years))+1:0]
+  ].filter(s=>s[1]>0);
+  if(stats.length<2)return;
+  grid.innerHTML=stats.map(([k])=>`<div><div class="stat-v" data-stat>0</div><div class="stat-k">${esc(k)}</div></div>`).join('');
+  band.hidden=false;
+  // Count up only once the band actually scrolls into view.
+  const cells=$$('#stats-grid [data-stat]');
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(!en.isIntersecting)return;
+      cells.forEach((c,i)=>countUp(c,stats[i][1]));
+      obs.disconnect();
+    });
+  },{threshold:.35});
+  obs.observe(band);
+}
+async function initHomepageSections(){
+  try{
+    const feed=await api('/discovery');
+    if(!feed||!feed.rows)return;
+    renderCollectionStrip(feed.rows);
+    renderStats(feed);
+  }catch(e){ /* archive service offline — sections stay hidden */ }
+}
+
+/* ============================================================
+   Shared helpers for the map / dashboard / gallery screens
+   ============================================================ */
+// A rendition thumb URL looks like …/renditions/<slug>/640.jpeg; swap the
+// width segment to pull a larger version for the viewer without needing to
+// know the CDN base on the client.
+function scaledRendition(url,w){return url?url.replace(/\/\d+\.(jpe?g|webp|avif)/i,'/'+w+'.$1'):url}
+// Opens photos in the existing lightbox (zoom/pan/keyboard for free).
+function viewPhotos(items,idx){
+  const list=items.map(p=>({
+    id:p.id||p.photoId||p.slug, slug:p.slug,
+    url:p.url||scaledRendition(p.thumb,1440)||p.thumb||'',
+    lqip:p.lqip||null,
+    ai:{caption:(p.ai&&p.ai.caption)||p.caption||'',altText:(p.ai&&p.ai.altText)||p.caption||'Photograph'},
+    exif:p.exif||{}
+  }));
+  if(Exhibition&&Exhibition.Lightbox)Exhibition.Lightbox.open(list,idx||0,null);
+}
+async function copyText(text,okMsg){
+  try{ await navigator.clipboard.writeText(text); toast(okMsg||'Copied'); }
+  catch(e){
+    // Clipboard API needs a secure context; fall back to a temp selection.
+    const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast(okMsg||'Copied')}catch(_){toast('Copy failed — select manually')}
+    ta.remove();
+  }
+}
+// Horizontal magnitude bars — one series, one hue (the site accent), value
+// direct-labelled on each bar. Items: [{label,count}] (or a custom valueKey).
+function barChart(items,opts){
+  opts=opts||{};
+  const rows=(items||[]).filter(Boolean);
+  if(!rows.length)return '<p class="dash-empty">Not enough data yet.</p>';
+  const key=opts.valueKey||'count';
+  const max=Math.max.apply(null,rows.map(r=>r[key]||0))||1;
+  const fmt=opts.format||(v=>String(v));
+  return `<ul class="bars" role="list">${rows.map(r=>{
+    const v=r[key]||0, pct=Math.max(2,Math.round(v/max*100));
+    return `<li class="bar-row" role="listitem" aria-label="${esc(r.label)}: ${esc(fmt(v))}">
+      <span class="bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${pct}%"></span></span>
+      <span class="bar-val">${esc(fmt(v))}</span></li>`;
+  }).join('')}</ul>`;
+}
+function photoLeaderboard(items,unit){
+  if(!items||!items.length)return '<p class="dash-empty">No '+esc(unit)+' recorded yet.</p>';
+  return `<div class="lead-row">${items.map(p=>`
+    <button class="lead-item" data-slug="${esc(p.slug)}" title="${esc(p.caption||'Untitled')}">
+      <img src="${esc(p.lqip||'')}" data-thumb="${esc(p.thumb||'')}" alt="${esc(p.caption||'Photograph')}" loading="lazy"/>
+      <span class="lead-count">${p.count} ${esc(unit)}</span>
+    </button>`).join('')}</div>`;
+}
+
+/* ============================================================
+   Photography map — GPS clusters on an equirectangular plot
+   No external tiles/libraries (keeps the page self-contained);
+   markers are projected from lat/lon, sized by photo count, with
+   an optional density heatmap and a year-range timeline.
+   ============================================================ */
+const MAP_ZOOMS={country:2,region:4,city:7};
+const mapState={level:'region',from:null,to:null,heat:false,loaded:false};
+function project(lat,lon){return {x:lon+180,y:90-lat}}
+async function renderMap(){
+  const host=$('#page-map');
+  if(!mapState.loaded){
+    host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
+      <div class="section-label"><b>◵</b> Where the frames were made</div>
+      <div class="map-loading"><span class="xp-status"><span class="xp-dotpulse"></span>Plotting the archive…</span></div>
+    </div></div>`;
+  }
+  let data;
+  try{
+    const q=new URLSearchParams({zoom:MAP_ZOOMS[mapState.level]});
+    if(mapState.from)q.set('fromYear',mapState.from);
+    if(mapState.to)q.set('toYear',mapState.to);
+    data=await api('/discovery/map?'+q.toString());
+  }catch(e){
+    host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
+      <p class="xp-empty">The map needs the archive service. Start the backend to see it.</p></div></div>`;
+    return;
+  }
+  mapState.loaded=true;
+  const yr=data.yearRange;
+  if(yr&&mapState.from===null){mapState.from=yr.from;mapState.to=yr.to}
+  const clusters=data.clusters||[];
+  const maxCount=Math.max.apply(null,clusters.map(c=>c.count)) || 1;
+  const rScale=n=>2.2+Math.sqrt(n/maxCount)*7;
+
+  const yearOptions=(sel)=>{
+    if(!yr)return '';
+    let o='';for(let y=yr.from;y<=yr.to;y++)o+=`<option value="${y}"${y===sel?' selected':''}>${y}</option>`;return o;
+  };
+
+  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
+    <div class="section-label"><b>◵</b> Where the frames were made</div>
+    <div class="map-head">
+      <p class="map-lede">${data.totalGeotagged} geotagged frame${data.totalGeotagged===1?'':'s'} across the archive.
+        Larger markers hold more photographs — select one to browse it.</p>
+      <div class="map-controls">
+        <div class="seg" role="group" aria-label="Map detail">
+          ${Object.keys(MAP_ZOOMS).map(k=>`<button class="seg-btn${k===mapState.level?' on':''}" data-level="${k}">${k[0].toUpperCase()+k.slice(1)}</button>`).join('')}
+        </div>
+        <button class="map-toggle${mapState.heat?' on':''}" id="map-heat" aria-pressed="${mapState.heat}">Heatmap</button>
+        ${yr?`<label class="map-years">From <select id="map-from">${yearOptions(mapState.from)}</select>
+          to <select id="map-to">${yearOptions(mapState.to)}</select></label>`:''}
+      </div>
+    </div>
+    <div class="map-canvas${mapState.heat?' heat-on':''}">
+      <svg viewBox="0 0 360 180" preserveAspectRatio="xMidYMid meet" role="img"
+           aria-label="World map of photograph locations">
+        <defs><filter id="map-blur" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="4"/></filter></defs>
+        <g class="graticule">
+          ${[-150,-120,-90,-60,-30,0,30,60,90,120,150].map(l=>`<line x1="${l+180}" y1="0" x2="${l+180}" y2="180"/>`).join('')}
+          ${[-60,-30,0,30,60].map(l=>`<line x1="0" y1="${90-l}" x2="360" y2="${90-l}"/>`).join('')}
+          <line class="equator" x1="0" y1="90" x2="360" y2="90"/>
+        </g>
+        <g class="heat" filter="url(#map-blur)">
+          ${clusters.map(c=>{const p=project(c.lat,c.lon);return `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${(rScale(c.count)*1.8).toFixed(2)}" opacity="${(0.15+0.5*c.count/maxCount).toFixed(2)}"/>`}).join('')}
+        </g>
+        <g class="markers">
+          ${clusters.map((c,i)=>{const p=project(c.lat,c.lon);return `<circle class="marker" data-i="${i}" tabindex="0" role="button"
+            aria-label="${esc(c.place||'Unknown location')}, ${c.count} photograph${c.count===1?'':'s'}"
+            cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${rScale(c.count).toFixed(2)}"><title>${esc(c.place||'Location')} · ${c.count}</title></circle>`}).join('')}
+        </g>
+      </svg>
+    </div>
+    <div class="map-panel" id="map-panel" hidden></div>
+  </div></div>`;
+
+  $$('#page-map .seg-btn').forEach(b=>b.onclick=()=>{mapState.level=b.dataset.level;renderMap()});
+  const heatBtn=$('#map-heat');if(heatBtn)heatBtn.onclick=()=>{mapState.heat=!mapState.heat;renderMap()};
+  const fromSel=$('#map-from'),toSel=$('#map-to');
+  if(fromSel)fromSel.onchange=()=>{mapState.from=+fromSel.value;if(mapState.to<mapState.from)mapState.to=mapState.from;renderMap()};
+  if(toSel)toSel.onchange=()=>{mapState.to=+toSel.value;if(mapState.from>mapState.to)mapState.from=mapState.to;renderMap()};
+
+  $$('#page-map .marker').forEach(m=>{
+    const open=()=>openCluster(clusters[+m.dataset.i]);
+    m.onclick=open;
+    m.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}};
+  });
+}
+async function openCluster(cluster){
+  const panel=$('#map-panel');
+  panel.hidden=false;
+  panel.innerHTML=`<div class="xp-status"><span class="xp-dotpulse"></span>Loading ${cluster.count} frame${cluster.count===1?'':'s'}…</div>`;
+  panel.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'nearest'});
+  let photos=[];
+  try{ const r=await api('/discovery/map/photos',{method:'POST',body:{photoIds:cluster.photoIds}}); photos=r.photos||[]; }
+  catch(e){ panel.innerHTML='<p class="dash-empty">Could not load these frames.</p>'; return; }
+  panel.innerHTML=`<div class="map-panel-head">
+      <h3>${esc(cluster.place||'This location')}</h3>
+      <span>${cluster.count} photograph${cluster.count===1?'':'s'}</span>
+      <button class="map-panel-x" aria-label="Close">&times;</button>
+    </div>
+    <div class="map-thumbs">${photos.map((p,i)=>`
+      <button class="map-thumb" data-i="${i}" aria-label="Open ${esc((p.ai&&p.ai.title)||(p.ai&&p.ai.caption)||'photograph')}">
+        <img src="${esc(p.lqip||p.thumb)}" alt=""/></button>`).join('')}</div>`;
+  $('.map-panel-x',panel).onclick=()=>{panel.hidden=true};
+  $$('.map-thumb',panel).forEach(t=>t.onclick=()=>viewPhotos(photos,+t.dataset.i));
+}
+
+/* ============================================================
+   Analytics dashboard (owner only)
+   ============================================================ */
+let dashLoaded=false;
+async function renderDashboard(force){
+  const host=$('#page-dashboard');
+  if(!dashLoaded||force){
+    host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
+      <div class="section-label"><b>◷</b> Portfolio dashboard</div>
+      <div class="dash-loading"><span class="xp-status"><span class="xp-dotpulse"></span>Crunching the archive…</span></div>
+    </div></div>`;
+  }
+  let ins,stats;
+  try{ [ins,stats]=await Promise.all([api('/admin/insights'+(force?'?refresh=true':'')),api('/admin/stats').catch(()=>null)]); }
+  catch(e){
+    host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
+      <p class="xp-empty">The dashboard needs the archive service and an owner session.</p></div></div>`;
+    return;
+  }
+  dashLoaded=true;
+  const ev=(stats&&stats.eventsByType)||{};
+  const num=n=>n==null?'—':new Intl.NumberFormat().format(Math.round(n));
+  const score=n=>n==null?'—':(Math.round(n*10)/10).toFixed(1);
+  const kpis=[
+    ['Photographs',num(ins.totalPhotos)],
+    ['Photo views',num(ev.photo_view||0)],
+    ['Avg composition',score(ins.averageScores&&ins.averageScores.composition)+' / 10'],
+    ['Avg quality',score(ins.averageScores&&ins.averageScores.quality)+' / 10']
+  ];
+  const monthLabel=m=>{const d=new Date(m);return isNaN(d)?String(m):d.toLocaleDateString(undefined,{month:'short',year:'2-digit'})};
+  const monthly=(ins.monthlyUploads||[]).map(r=>({label:monthLabel(r.month),count:r.count}));
+  const colors=(ins.colorTrends||[]);
+
+  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap dash">
+    <div class="dash-top">
+      <div class="section-label" style="margin:0"><b>◷</b> Portfolio dashboard</div>
+      <button class="btn-refresh" id="dash-refresh">Refresh</button>
+    </div>
+
+    ${ins.narrative?`<p class="dash-narrative">${esc(ins.narrative)}</p>`:''}
+
+    <div class="kpi-row">${kpis.map(([k,v])=>`<div class="kpi"><div class="kpi-v">${esc(v)}</div><div class="kpi-k">${esc(k)}</div></div>`).join('')}</div>
+
+    <div class="dash-grid">
+      <div class="dash-card dash-wide"><h3>Uploads over time</h3>${barChart(monthly)}</div>
+      <div class="dash-card"><h3>Cameras</h3>${barChart(ins.cameraUsage)}</div>
+      <div class="dash-card"><h3>Lenses</h3>${barChart(ins.lensUsage)}</div>
+      <div class="dash-card"><h3>Focal length</h3>${barChart(ins.focalLengthDistribution)}</div>
+      <div class="dash-card"><h3>ISO</h3>${barChart(ins.isoDistribution)}</div>
+      <div class="dash-card"><h3>Genres</h3>${barChart(ins.genreDistribution)}</div>
+      <div class="dash-card"><h3>Top subjects</h3>${barChart((ins.topSubjects||[]).slice(0,8))}</div>
+      <div class="dash-card"><h3>By month of year</h3>${barChart(ins.seasonalTrends)}</div>
+      <div class="dash-card"><h3>Locations</h3>${barChart((ins.shootingLocations||[]).slice(0,8))}</div>
+      <div class="dash-card"><h3>Colour palette</h3>
+        ${colors.length?`<div class="color-trends">${colors.map(c=>`<span class="color-chip" title="${esc(c.hex)} · ${c.uses} photo${c.uses===1?'':'s'}" style="background:${esc(c.hex)};flex-grow:${Math.max(1,Math.round(c.totalShare*10))}"></span>`).join('')}</div>`:'<p class="dash-empty">No palettes yet.</p>'}
+      </div>
+      <div class="dash-card dash-wide"><h3>Most viewed</h3>${photoLeaderboard(ins.mostViewed,'views')}</div>
+      <div class="dash-card dash-wide"><h3>Most downloaded</h3>${photoLeaderboard(ins.mostDownloaded,'downloads')}</div>
+    </div>
+    <p class="dash-foot">Generated ${ins.generatedAt?new Date(ins.generatedAt).toLocaleString():'just now'} · IST</p>
+  </div></div>`;
+
+  $('#dash-refresh').onclick=()=>renderDashboard(true);
+  // Leaderboard thumbs upgrade from lqip → real thumb, then open on click.
+  $$('#page-dashboard .lead-item').forEach(b=>{
+    const img=$('img',b);if(img&&img.dataset.thumb)img.src=img.dataset.thumb;
+    // showDetail() itself navigates to the photo page (go('photo')); a
+    // photo not in the first page of the archive just opens in the viewer.
+    b.onclick=()=>{const p=state.photos.find(z=>z.slug===b.dataset.slug);
+      if(p)Exhibition.showDetail(p);
+      else viewPhotos([{slug:b.dataset.slug,thumb:img&&img.dataset.thumb,caption:''}],0);};
+  });
+}
+
+/* ============================================================
+   Client gallery management (owner only)
+   ============================================================ */
+let galleriesCache=[];
+async function renderGalleries(){
+  const host=$('#page-galleries');
+  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
+    <div class="section-label"><b>◈</b> Client galleries</div>
+    <div class="gal-loading"><span class="xp-status"><span class="xp-dotpulse"></span>Loading collections…</span></div>
+  </div></div>`;
+  try{ const r=await api('/collections'); galleriesCache=r.collections||[]; }
+  catch(e){
+    host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
+      <p class="xp-empty">Galleries need the archive service and an owner session.</p></div></div>`;
+    return;
+  }
+  const kinds=['COLLECTION','ALBUM','PROJECT','STORY','JOURNAL','SEASONAL'];
+  const kindLabel=k=>k.charAt(0)+k.slice(1).toLowerCase();
+  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap gal">
+    <div class="dash-top">
+      <div class="section-label" style="margin:0"><b>◈</b> Client galleries</div>
+      <button class="btn-solid gal-new-btn" id="gal-new">New collection</button>
+    </div>
+    <form class="gal-create" id="gal-create" hidden>
+      <div class="fld"><input id="gal-name" placeholder="Collection name" maxlength="80"/></div>
+      <div class="fld"><input id="gal-desc" placeholder="Description (optional)" maxlength="500"/></div>
+      <div class="gal-create-row">
+        <select id="gal-kind">${kinds.map(k=>`<option value="${k}">${kindLabel(k)}</option>`).join('')}</select>
+        <label class="gal-check"><input type="checkbox" id="gal-public"/> Public</label>
+        <button type="submit" class="btn-solid">Create</button>
+      </div>
+    </form>
+    ${galleriesCache.length?`<div class="gal-list">${galleriesCache.map(renderGalleryCard).join('')}</div>`
+      :'<p class="dash-empty" style="margin-top:2rem">No collections yet. Create one to start building a client gallery.</p>'}
+  </div></div>`;
+
+  const newBtn=$('#gal-new'),form=$('#gal-create');
+  newBtn.onclick=()=>{form.hidden=!form.hidden;if(!form.hidden)$('#gal-name').focus()};
+  form.onsubmit=async e=>{
+    e.preventDefault();
+    const name=$('#gal-name').value.trim();
+    if(!name){toast('Name the collection');return}
+    try{
+      await api('/collections',{method:'POST',body:{name,description:$('#gal-desc').value.trim()||undefined,
+        kind:$('#gal-kind').value,isPublic:$('#gal-public').checked}});
+      toast('Collection created');renderGalleries();
+    }catch(err){toast(err.message||'Could not create')}
+  };
+  wireGalleryCards();
+}
+function renderGalleryCard(c){
+  const shared=!!c.shareSlug;
+  const expired=c.expiresAt&&new Date(c.expiresAt)<new Date();
+  const kindLabel=c.kind?c.kind.charAt(0)+c.kind.slice(1).toLowerCase():'Collection';
+  return `<article class="gal-card" data-id="${esc(c.id)}">
+    <div class="gal-card-head">
+      <div>
+        <h3>${esc(c.name)}</h3>
+        <div class="gal-meta">
+          <span class="gal-badge">${esc(kindLabel)}</span>
+          <span>${c.photoCount||0} photo${(c.photoCount||0)===1?'':'s'}</span>
+          ${shared?`<span class="gal-badge ${expired?'warn':'live'}">${expired?'Link expired':'Shared'}</span>`:''}
+          ${c.hasPassword?'<span class="gal-badge">🔒 Password</span>':''}
+        </div>
+      </div>
+      <div class="gal-actions">
+        <button class="rm gal-add" data-id="${esc(c.id)}">Add photos</button>
+        <button class="rm gal-share-btn" data-id="${esc(c.id)}">${shared?'Sharing':'Share'}</button>
+        <button class="rm gal-del" data-id="${esc(c.id)}">Delete</button>
+      </div>
+    </div>
+    ${c.description?`<p class="gal-desc">${esc(c.description)}</p>`:''}
+    <div class="gal-share" data-share="${esc(c.id)}" hidden></div>
+    <div class="gal-picker" data-picker="${esc(c.id)}" hidden></div>
+  </article>`;
+}
+function wireGalleryCards(){
+  $$('#page-galleries .gal-del').forEach(b=>b.onclick=()=>{
+    $('#cf-h').textContent='Delete collection?';
+    $('#cf-p').textContent='The photographs stay in the archive — only this grouping is removed.';
+    $('#cf-yes').textContent='Delete';$('#confirm').classList.add('open');
+    $('#cf-yes').onclick=async()=>{
+      $('#confirm').classList.remove('open');
+      try{await api('/collections/'+b.dataset.id,{method:'DELETE'});toast('Collection deleted');renderGalleries()}
+      catch(e){toast(e.message||'Could not delete')}
+      $('#cf-h').textContent='Remove this frame?';$('#cf-p').textContent='It will leave the archive. This cannot be undone.';
+      $('#cf-yes').textContent='Yes, remove';$('#cf-yes').onclick=null;
+    };
+  });
+  $$('#page-galleries .gal-share-btn').forEach(b=>b.onclick=()=>toggleShareForm(b.dataset.id));
+  $$('#page-galleries .gal-add').forEach(b=>b.onclick=()=>togglePhotoPicker(b.dataset.id));
+}
+function toggleShareForm(id){
+  const box=$('[data-share="'+id+'"]');
+  if(!box.hidden){box.hidden=true;return}
+  $$('#page-galleries [data-share]').forEach(b=>b.hidden=true);
+  $$('#page-galleries [data-picker]').forEach(b=>b.hidden=true);
+  const c=galleriesCache.find(x=>x.id===id)||{};
+  const shared=!!c.shareSlug;
+  const shareUrl=shared?(location.origin+location.pathname+'?gallery='+c.shareSlug):'';
+  box.innerHTML=`
+    ${shared?`<div class="share-url"><input readonly value="${esc(shareUrl)}" aria-label="Share link"/>
+      <button class="rm" data-copy>Copy</button></div>`:''}
+    <div class="share-opts">
+      <label class="fld share-pw"><span>Password (optional)</span>
+        <input type="text" data-pw placeholder="${c.hasPassword?'••••• set — type to change':'No password'}"/></label>
+      <label class="fld"><span>Expires (optional)</span>
+        <input type="date" data-exp${c.expiresAt?` value="${new Date(c.expiresAt).toISOString().slice(0,10)}"`:''}/></label>
+    </div>
+    <div class="share-toggles">
+      <label class="gal-check"><input type="checkbox" data-dl ${c.allowDownload!==false?'checked':''}/> Allow downloads</label>
+      <label class="gal-check"><input type="checkbox" data-wm ${c.watermark?'checked':''}/> Watermark</label>
+    </div>
+    <div class="share-actions">
+      <button class="btn-solid" data-savelink>${shared?'Update link':'Create link'}</button>
+      ${shared?'<button class="rm" data-revoke>Revoke</button>':''}
+    </div>`;
+  box.hidden=false;
+  const copyBtn=$('[data-copy]',box);if(copyBtn)copyBtn.onclick=()=>copyText(shareUrl,'Share link copied');
+  $('[data-savelink]',box).onclick=async()=>{
+    const pw=$('[data-pw]',box).value.trim();
+    const exp=$('[data-exp]',box).value;
+    const body={allowDownload:$('[data-dl]',box).checked,watermark:$('[data-wm]',box).checked};
+    if(pw)body.password=pw;
+    if(exp)body.expiresAt=new Date(exp+'T23:59:59').toISOString();
+    try{
+      const r=await api('/collections/'+id+'/share',{method:'POST',body});
+      toast('Share link ready');
+      const idx=galleriesCache.findIndex(x=>x.id===id);
+      if(idx>-1)galleriesCache[idx]=Object.assign({},galleriesCache[idx],{shareSlug:r.shareSlug,hasPassword:r.hasPassword,expiresAt:r.expiresAt,allowDownload:r.allowDownload,watermark:r.watermark});
+      // Re-render just this card's chrome so badges/URL reflect the change.
+      const card=$('.gal-card[data-id="'+id+'"]');if(card)card.outerHTML=renderGalleryCard(galleriesCache[idx]);
+      wireGalleryCards();toggleShareForm(id);
+    }catch(e){toast(e.message||'Could not save link')}
+  };
+  const rev=$('[data-revoke]',box);
+  if(rev)rev.onclick=async()=>{
+    try{await api('/collections/'+id+'/share',{method:'DELETE'});toast('Link revoked');
+      const idx=galleriesCache.findIndex(x=>x.id===id);
+      if(idx>-1)galleriesCache[idx]=Object.assign({},galleriesCache[idx],{shareSlug:null,hasPassword:false,expiresAt:null});
+      renderGalleries();
+    }catch(e){toast(e.message||'Could not revoke')}
+  };
+}
+async function togglePhotoPicker(id){
+  const box=$('[data-picker="'+id+'"]');
+  if(!box.hidden){box.hidden=true;return}
+  $$('#page-galleries [data-picker]').forEach(b=>b.hidden=true);
+  $$('#page-galleries [data-share]').forEach(b=>b.hidden=true);
+  const pool=state.photos.slice(0,60);
+  if(!pool.length){box.innerHTML='<p class="dash-empty">Upload photographs first.</p>';box.hidden=false;return}
+  box.innerHTML=`<p class="picker-hint">Select frames to add to this collection.</p>
+    <div class="picker-grid">${pool.map(p=>`
+      <button class="picker-item" data-pid="${esc(p.id)}" aria-pressed="false"
+        aria-label="Toggle ${esc((p.ai&&p.ai.caption)||'photograph')}">
+        <img src="${esc(p.lqip||p.url)}" alt=""/><span class="picker-check">✓</span></button>`).join('')}</div>
+    <div class="picker-actions"><button class="btn-solid" data-addsel>Add selected</button></div>`;
+  box.hidden=false;
+  const chosen=new Set();
+  $$('.picker-item',box).forEach(it=>it.onclick=()=>{
+    const pid=it.dataset.pid;
+    if(chosen.has(pid)){chosen.delete(pid);it.setAttribute('aria-pressed','false')}
+    else{chosen.add(pid);it.setAttribute('aria-pressed','true')}
+  });
+  $('[data-addsel]',box).onclick=async()=>{
+    if(!chosen.size){toast('Select at least one');return}
+    try{
+      for(const pid of chosen)await api('/collections/'+id+'/photos',{method:'POST',body:{photoId:pid}});
+      toast(chosen.size+' added');renderGalleries();
+    }catch(e){toast(e.message||'Could not add')}
+  };
+}
+
+/* ============================================================
+   Public shared gallery — what a client sees at ?gallery=<slug>
+   ============================================================ */
+async function renderSharedGallery(slug){
+  const host=$('#page-shared');
+  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
+    <div class="shared-loading"><span class="xp-status"><span class="xp-dotpulse"></span>Opening gallery…</span></div></div></div>`;
+  let g;
+  try{ g=await api('/collections/shared/'+encodeURIComponent(slug)); }
+  catch(e){
+    const msg=e.status===410?'This gallery link has expired.':e.status===404?'This gallery could not be found.':'This gallery is unavailable right now.';
+    host.innerHTML=`<div class="section" style="padding-top:8rem"><div class="wrap"><div class="shared-msg">
+      <h1>${esc(msg)}</h1><p><a href="${location.pathname}">Back to the portfolio</a></p></div></div></div>`;
+    return;
+  }
+  if(g.locked){
+    host.innerHTML=`<div class="section" style="padding-top:8rem"><div class="wrap"><div class="shared-lock">
+      <div class="section-label"><b>🔒</b> Private gallery</div>
+      <h1>${esc(g.name)}</h1>
+      <p>${g.photoCount} photograph${g.photoCount===1?'':'s'} · enter the password to view.</p>
+      <form id="shared-unlock" class="shared-unlock">
+        <div class="err" id="shared-err"></div>
+        <div class="fld"><input type="password" id="shared-pw" placeholder="Gallery password" autocomplete="off"/></div>
+        <button class="submit" type="submit">Unlock gallery</button>
+      </form></div></div></div>`;
+    $('#shared-unlock').onsubmit=async e=>{
+      e.preventDefault();
+      const err=$('#shared-err');err.classList.remove('show');
+      try{
+        await api('/collections/shared/'+encodeURIComponent(slug)+'/unlock',{method:'POST',body:{password:$('#shared-pw').value}});
+        renderSharedGallery(slug);
+      }catch(er){err.textContent=er.message||'Incorrect password.';err.classList.add('show')}
+    };
+    return;
+  }
+  const photos=g.photos||[];
+  const wm=g.watermark?' watermarked':'';
+  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap shared">
+    <div class="shared-head">
+      <div class="section-label"><b>◈</b> ${esc((g.kind||'gallery').toLowerCase())}</div>
+      <h1>${esc(g.name)}</h1>
+      ${g.description?`<p class="shared-desc">${esc(g.description)}</p>`:''}
+      <p class="shared-count">${photos.length} photograph${photos.length===1?'':'s'}${g.expiresAt?` · available until ${new Date(g.expiresAt).toLocaleDateString()}`:''}</p>
+    </div>
+    ${photos.length?`<div class="shared-grid${wm}">${photos.map((p,i)=>{
+      const set=(p.urls&&p.urls.jpeg)||'';
+      const thumb=set.split(',')[0]?set.split(',')[0].trim().split(' ')[0]:(p.urls&&p.urls.original)||'';
+      return `<figure class="shared-item">
+        <button class="shared-open" data-i="${i}" aria-label="Open ${esc((p.ai&&p.ai.title)||(p.ai&&p.ai.caption)||'photograph')}">
+          <img src="${esc(p.lqip||'')}" data-full="${esc(thumb)}" alt="${esc((p.ai&&p.ai.altText)||'Photograph')}" loading="lazy"/>
+          ${g.watermark?'<span class="shared-wm">© Katnam Sathvik</span>':''}
+        </button>
+        ${g.allowDownload?`<a class="shared-dl" href="${esc((p.urls&&p.urls.original)||thumb)}" download aria-label="Download">Download</a>`:''}
+      </figure>`;
+    }).join('')}</div>`:'<p class="xp-empty">This gallery has no photographs yet.</p>'}
+    <p class="shared-foot"><a href="${location.pathname}">Katnam Sathvik — Photography</a></p>
+  </div></div>`;
+  $$('#page-shared img[data-full]').forEach(im=>{im.src=im.dataset.full});
+  const openList=photos.map(p=>{
+    const set=(p.urls&&p.urls.jpeg)||'';const entries=set.split(',').map(s=>s.trim()).filter(Boolean);
+    const big=entries.length?entries[entries.length-1].split(' ')[0]:(p.urls&&p.urls.original)||'';
+    return {id:p.id,url:big,lqip:p.lqip,ai:p.ai,exif:{}};
+  });
+  $$('#page-shared .shared-open').forEach(b=>b.onclick=()=>viewPhotos(openList,+b.dataset.i));
+  go('shared');
+}
+
 /* ---------- boot ---------- */
 (async function boot(){
+  try{ const {user}=await api('/auth/me'); state.user=user }catch(e){ /* not signed in */ }
   renderNav();
   state.photos=await load();
   await Exhibition.init({
@@ -783,6 +1971,13 @@ addEventListener('keydown',e=>{if(e.key==='Escape'){closeAuth();
   refreshHero();
   renderQueue();
   renderChat();
+  trackEvent('page_view');
+  // Non-blocking: the gallery is already interactive by this point.
+  initHomepageSections();
+  // Deep link: a client arriving at ?gallery=<slug> lands straight on
+  // their shared gallery rather than the portfolio home.
+  const sharedSlug=new URLSearchParams(location.search).get('gallery');
+  if(sharedSlug)renderSharedGallery(sharedSlug);
 })();
 </script>
 </body>

@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: server
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      # Dummy values so env validation (zod) and `prisma generate` pass
+      # in CI. No real credentials are used or required for lint/
+      # typecheck/unit tests/docker build.
+      NODE_ENV: test
+      API_BASE_URL: http://localhost:4000
+      CLIENT_ORIGIN: http://localhost:8080
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-access-secret-ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret-ci-refresh-secret
+      OWNER_EMAIL: owner@example.com
+      S3_BUCKET: ci-bucket
+      S3_KEY: ci
+      S3_SECRET: ci
+      CDN_BASE: http://localhost:9000/ci-bucket
+      ANTHROPIC_API_KEY: sk-ant-ci
+      OPENAI_API_KEY: sk-ci
+      SMTP_HOST: localhost
+      MAIL_FROM: "CI <ci@example.com>"
+      CONTACT_TO_EMAIL: owner@example.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Build Docker image
+        run: docker build --target runtime -t sathvik-photography-api:ci .

@@ -519,22 +519,20 @@ Return exactly this JSON shape:
     }
 
     async function semanticSearch(query, photos) {
-      const catalogue = photos.map((p, i) => ({
-        i,
-        caption: (p.ai && p.ai.caption) || 'Untitled',
-        tags: (p.ai && p.ai.tags) || [],
-        mood: (p.ai && p.ai.mood) || '',
-        cats: (p.ai && p.ai.categories) || []
-      }));
-      const raw = await call([{
-        role: 'user',
-        content: `Photo catalogue:\n${JSON.stringify(catalogue)}\n\n` +
-          `Viewer asked: "${query}"\n\n` +
-          `Return JSON only: {"matches":[{"i":0,"why":"under 6 words"}]} ` +
-          `ordered best first, max 12, empty array if nothing fits.`
-      }], 'You match natural-language queries to photographs. JSON only.', null, 800);
-      const j = parseJSON(raw);
-      return (j.matches || []).filter(m => photos[m.i]).map(m => ({ photo: photos[m.i], why: m.why }));
+      // Real pgvector hybrid search on the backend (server/src/modules/search)
+      // — not the generic AI.call() passthrough, since the server doesn't
+      // expose a raw Claude proxy (any visitor could otherwise run arbitrary
+      // prompts through the site's API key). Falls back to throwing, which
+      // the caller (Gallery.aiSearch) already catches and handles by
+      // showing the offline lexical results instead.
+      const base = CFG.apiBase || 'http://localhost:4000/api';
+      const res = await fetch(`${base}/search?q=${encodeURIComponent(query)}&k=12`, { credentials: 'include' });
+      if (!res.ok) throw new Error('search request failed: ' + res.status);
+      const { results } = await res.json();
+      const byId = new Map(photos.map(p => [p.id, p]));
+      return (results || [])
+        .filter(r => byId.has(r.photo.id))
+        .map(r => ({ photo: byId.get(r.photo.id), why: Math.round(r.score * 100) + '% match' }));
     }
 
     return { call, parseJSON, enrich, semanticSearch };
@@ -933,6 +931,33 @@ Return exactly this JSON shape:
     let mount, masonry, photos = [], activeFilter = 'all', searchState = null;
     let getPhotos = () => [], persist = () => {}, detailMount = null;
 
+    /* ---- View modes -------------------------------------------------
+       Discovery is the default browsing experience; Masonry is the
+       original layout, preserved byte-for-byte (same card(), same
+       Masonry() engine, same FLIP animation) and simply no longer the
+       only option. Grid is a new uniform layout. The choice persists
+       per-visitor in localStorage.
+       ---------------------------------------------------------------- */
+    const VIEWS = ['discovery', 'masonry', 'grid'];
+    const VIEW_KEY = 'xp_view';
+    let view = (() => {
+      try { const v = localStorage.getItem(VIEW_KEY); return VIEWS.includes(v) ? v : 'discovery'; }
+      catch (e) { return 'discovery'; }
+    })();
+    let discoveryFeed = null;
+
+    function setView(next, { persistChoice = true } = {}) {
+      if (!VIEWS.includes(next) || next === view) return;
+      view = next;
+      if (persistChoice) { try { localStorage.setItem(VIEW_KEY, next); } catch (e) {} }
+      build();
+    }
+
+    /** A search or category filter is narrowing the archive right now. */
+    function queryActive() {
+      return !!searchState || activeFilter !== 'all';
+    }
+
     function categoriesOf(p) {
       const ai = p.ai || {};
       return Array.from(new Set([...(ai.categories || []), ...(ai.collections || [])]))
@@ -961,7 +986,10 @@ Return exactly this JSON shape:
         <div class="xp-frame">
           ${p.lqip ? `<img class="xp-lqip" src="${esc(p.lqip)}" alt="" aria-hidden="true"/>`
                    : '<div class="xp-skel"></div>'}
-          <img class="xp-full" data-src="${esc(p.url)}"
+          <img class="xp-full" data-src="${esc(p.url)}"${
+            p.urls && p.urls.jpeg
+              ? ` data-srcset="${esc(p.urls.jpeg)}" sizes="(max-width:640px) 50vw, (max-width:1100px) 33vw, 25vw"`
+              : ''}
                alt="${esc(ai.altText || ai.caption || 'Photograph')}" loading="lazy" decoding="async"/>
           <div class="xp-badge">${(ai.categories || []).slice(0, 2)
             .map(c => `<span class="xp-pill">${esc(c)}</span>`).join('')}</div>
@@ -985,22 +1013,244 @@ Return exactly this JSON shape:
       return masonry ? masonry.items.filter(it => !it.hidden).map(it => it.photo) : photos;
     }
 
+    /* ---- Discovery ---------------------------------------------------
+       Horizontal, AI-categorised rows built server-side from each
+       photo's generated metadata (see server/src/modules/discovery).
+       Rows scroll sideways while the page scrolls down.
+       ------------------------------------------------------------------ */
+
+    /** Backend card → the internal photo shape the rest of this file uses.
+     *  Prefers the already-hydrated local object when we have it (it has
+     *  the client-side palette/vector), falling back to a minimal object
+     *  built from the card so rails still work for photos outside the
+     *  first page of /api/photos. */
+    function adaptCard(c) {
+      const local = photos.find(p => p.id === c.id);
+      if (local) return local;
+      const srcset = (c.urls && c.urls.jpeg) || '';
+      const entries = srcset.split(',').map(s => s.trim()).filter(Boolean);
+      const largest = entries.length ? entries[entries.length - 1].split(' ')[0] : '';
+      return {
+        id: c.id, slug: c.slug,
+        url: largest || (c.urls && c.urls.original) || '',
+        lqip: c.lqip, aspect: c.aspect || 0.75,
+        width: c.width, height: c.height,
+        createdAt: c.createdAt,
+        palette: { colors: c.colors || [] },
+        ai: c.ai ? {
+          caption: c.ai.title || c.ai.caption, altText: c.ai.altText,
+          story: c.ai.story, mood: c.ai.mood, categories: c.ai.genre ? [c.ai.genre] : []
+        } : null
+      };
+    }
+
+    function railTile(c, rowPhotos, idx) {
+      const el = document.createElement('article');
+      el.className = 'xp-rail-item';
+      el.tabIndex = 0;
+      el.setAttribute('role', 'button');
+      const ai = c.ai || {};
+      const label = ai.title || ai.caption || 'Untitled frame';
+      el.setAttribute('aria-label', `Open ${label}`);
+      const thumb = (() => {
+        const set = (c.urls && c.urls.jpeg) || '';
+        const first = set.split(',')[0];
+        return first ? first.trim().split(' ')[0] : (c.urls && c.urls.original) || '';
+      })();
+      el.innerHTML = `
+        <div class="xp-rail-frame">
+          ${c.lqip ? `<img class="xp-rail-lqip" src="${esc(c.lqip)}" alt="" aria-hidden="true"/>` : ''}
+          <img class="xp-rail-img" data-src="${esc(thumb)}"
+               data-srcset="${esc((c.urls && c.urls.jpeg) || '')}"
+               sizes="(max-width:640px) 60vw, 280px"
+               alt="${esc(ai.altText || label)}" loading="lazy" decoding="async"/>
+          <div class="xp-rail-cap"><span>${esc(label)}</span></div>
+        </div>`;
+      const open = () => {
+        const list = rowPhotos.map(adaptCard);
+        Lightbox.open(list, idx, showDetail);
+      };
+      el.addEventListener('click', open);
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+      io.observe($('.xp-rail-img', el));
+      return el;
+    }
+
+    function renderRail(row) {
+      const section = document.createElement('section');
+      section.className = 'xp-rail';
+      section.setAttribute('aria-labelledby', 'rail-' + row.slug);
+      section.innerHTML = `
+        <div class="xp-rail-head">
+          <div>
+            <h3 class="xp-rail-title" id="rail-${esc(row.slug)}">${esc(row.title)}</h3>
+            ${row.subtitle ? `<p class="xp-rail-sub">${esc(row.subtitle)}</p>` : ''}
+          </div>
+          <div class="xp-rail-tools">
+            <span class="xp-rail-count">${row.total != null ? row.total : (row.photos || []).length}</span>
+            <button class="xp-rail-nav" data-dir="-1" aria-label="Scroll ${esc(row.title)} left">&#8249;</button>
+            <button class="xp-rail-nav" data-dir="1" aria-label="Scroll ${esc(row.title)} right">&#8250;</button>
+          </div>
+        </div>
+        <div class="xp-rail-track" role="list" tabindex="0"
+             aria-label="${esc(row.title)}, horizontally scrollable"></div>`;
+
+      const track = $('.xp-rail-track', section);
+      row.photos.forEach((c, i) => {
+        const tile = railTile(c, row.photos, i);
+        tile.setAttribute('role', 'listitem');
+        track.appendChild(tile);
+      });
+
+      $$('.xp-rail-nav', section).forEach(btn => {
+        btn.onclick = () => {
+          const dir = Number(btn.dataset.dir);
+          track.scrollBy({ left: dir * Math.round(track.clientWidth * 0.85),
+            behavior: reduceMotion() ? 'auto' : 'smooth' });
+        };
+      });
+      // Arrow keys move the row when the track itself has focus, so the
+      // rails are fully operable without a mouse or trackpad gesture.
+      track.addEventListener('keydown', e => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        e.preventDefault();
+        track.scrollBy({ left: (e.key === 'ArrowRight' ? 1 : -1) * 300,
+          behavior: reduceMotion() ? 'auto' : 'smooth' });
+      });
+
+      const sync = () => {
+        const max = track.scrollWidth - track.clientWidth - 2;
+        $$('.xp-rail-nav', section).forEach(b => {
+          const dir = Number(b.dataset.dir);
+          b.disabled = dir < 0 ? track.scrollLeft <= 2 : track.scrollLeft >= max;
+        });
+      };
+      track.addEventListener('scroll', debounce(sync, 80), { passive: true });
+      requestAnimationFrame(sync);
+      return section;
+    }
+
+    async function buildDiscovery(container) {
+      const note = document.createElement('div');
+      note.className = 'xp-discovery-loading';
+      note.innerHTML = '<span class="xp-status"><span class="xp-dotpulse"></span>Composing your archive…</span>';
+      container.appendChild(note);
+
+      try {
+        if (!discoveryFeed) {
+          const base = CFG.apiBase || 'http://localhost:4000/api';
+          const res = await fetch(base + '/discovery', { credentials: 'include' });
+          if (!res.ok) throw new Error('discovery unavailable');
+          discoveryFeed = await res.json();
+        }
+      } catch (e) {
+        // Backend unreachable — fall back to the local masonry layout so
+        // the gallery is never blank, and say so rather than failing quietly.
+        note.remove();
+        const fb = document.createElement('p');
+        fb.className = 'xp-empty';
+        fb.textContent = 'Discovery needs the archive service — showing the masonry layout instead.';
+        container.appendChild(fb);
+        buildMasonry(container);
+        return;
+      }
+
+      note.remove();
+      const rows = (discoveryFeed && discoveryFeed.rows) || [];
+      if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'xp-empty';
+        empty.textContent = 'No photographs in the archive yet.';
+        container.appendChild(empty);
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      rows.forEach(r => frag.appendChild(renderRail(r)));
+      container.appendChild(frag);
+    }
+
+    /* ---- Grid: uniform, denser alternative to masonry ---- */
+    function buildGrid(container) {
+      const grid = document.createElement('div');
+      grid.className = 'xp-grid';
+      grid.setAttribute('role', 'list');
+      container.appendChild(grid);
+
+      const list = photos.filter(p => {
+        if (searchState) return searchState.ids.has(p.id);
+        if (activeFilter !== 'all') return categoriesOf(p).some(c => c.toLowerCase() === activeFilter);
+        return true;
+      });
+
+      if (!list.length) {
+        const empty = document.createElement('p');
+        empty.className = 'xp-empty';
+        empty.textContent = 'No frames match that yet.';
+        container.appendChild(empty);
+        return;
+      }
+
+      list.forEach((p, i) => {
+        const ai = p.ai || {};
+        const el = document.createElement('article');
+        el.className = 'xp-grid-item';
+        el.tabIndex = 0;
+        el.setAttribute('role', 'listitem');
+        el.setAttribute('aria-label', `Open ${ai.caption || 'photograph'}`);
+        el.innerHTML = `
+          ${p.lqip ? `<img class="xp-grid-lqip" src="${esc(p.lqip)}" alt="" aria-hidden="true"/>` : ''}
+          <img class="xp-grid-img" data-src="${esc(p.url)}"${
+            p.urls && p.urls.jpeg
+              ? ` data-srcset="${esc(p.urls.jpeg)}" sizes="(max-width:640px) 33vw, 220px"`
+              : ''}
+               alt="${esc(ai.altText || ai.caption || 'Photograph')}" loading="lazy" decoding="async"/>
+          <div class="xp-grid-cap"><span>${esc(ai.caption || 'Untitled frame')}</span></div>`;
+        const open = () => Lightbox.open(list, i, showDetail);
+        el.addEventListener('click', open);
+        el.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
+        grid.appendChild(el);
+        io.observe($('.xp-grid-img', el));
+      });
+    }
+
     const io = new IntersectionObserver(entries => {
       entries.forEach(en => {
         if (!en.isIntersecting) return;
         const img = en.target;
         if (img.dataset.src) {
+          // srcset must be applied here too, not inline in the markup: a
+          // browser resolves srcset the moment it parses it (src isn't
+          // required), which would download every rail image up front and
+          // defeat the deferral entirely.
+          if (img.dataset.srcset) {
+            img.srcset = img.dataset.srcset;
+            img.removeAttribute('data-srcset');
+          }
           img.src = img.dataset.src;
           img.removeAttribute('data-src');
           img.addEventListener('load', () => {
             img.classList.add('xp-loaded');
+            // Masonry uses .xp-lqip; the discovery rails and grid use
+            // .xp-rail-lqip / .xp-grid-lqip. Match any of them so every
+            // layout gets the same blur-up cross-fade.
             const lq = img.previousElementSibling;
-            if (lq && lq.classList.contains('xp-lqip')) lq.style.opacity = '0';
+            if (lq && /(^|\s|-)lqip/.test(lq.className)) lq.style.opacity = '0';
           }, { once: true });
         }
         io.unobserve(img);
       });
     }, { rootMargin: '300px 0px' });
+
+    const VIEW_ICONS = {
+      discovery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="12" height="6" rx="1.5"/></svg>',
+      masonry: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7" height="10" rx="1.2"/><rect x="14" y="3" width="7" height="6" rx="1.2"/><rect x="3" y="17" width="7" height="4" rx="1.2"/><rect x="14" y="13" width="7" height="8" rx="1.2"/></svg>',
+      grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.2"/></svg>'
+    };
+    const VIEW_LABELS = { discovery: 'Discovery', masonry: 'Masonry', grid: 'Grid' };
 
     function toolbar() {
       const bar = document.createElement('div');
@@ -1016,7 +1266,18 @@ Return exactly this JSON shape:
                  aria-label="Search photographs in natural language"/>
           <button class="xp-search-ai" data-aisearch>Ask AI</button>
         </div>
+        <div class="xp-viewswitch" role="group" aria-label="Gallery layout">
+          ${VIEWS.map(v => `
+            <button class="xp-view-btn" data-view="${v}" type="button"
+                    aria-pressed="${v === view}" title="${VIEW_LABELS[v]} view"
+                    aria-label="${VIEW_LABELS[v]} view">
+              ${VIEW_ICONS[v]}<span>${VIEW_LABELS[v]}</span>
+            </button>`).join('')}
+        </div>
         <div class="xp-searchnote" data-note hidden></div>`;
+      $$('[data-view]', bar).forEach(b => {
+        b.onclick = () => setView(b.dataset.view);
+      });
       return bar;
     }
 
@@ -1041,7 +1302,11 @@ Return exactly this JSON shape:
     }
 
     function applyFilter() {
-      if (!masonry) return;
+      // Masonry filters in place, keeping its FLIP animation. The other
+      // two layouts have no live filter engine, so they re-render — and
+      // because `view` itself is never changed by a query, rebuilding is
+      // all that's needed to swap Discovery↔grid and back again.
+      if (!masonry) { build(); return; }
       masonry.filter(it => {
         const p = it.photo;
         if (searchState) return searchState.ids.has(p.id);
@@ -1091,23 +1356,21 @@ Return exactly this JSON shape:
       } finally { btn.disabled = false; }
     }
 
-    function build() {
-      mount.innerHTML = '';
-      const bar = toolbar();
-      mount.appendChild(bar);
-      renderFilters(bar);
-
+    /* The original masonry layout, unchanged — same card(), same Masonry()
+       engine, same staggered FLIP entrance. Only extracted into its own
+       function so the view switcher can call it. */
+    function buildMasonry(container) {
       const grid = document.createElement('div');
       grid.className = 'xp-masonry';
       grid.setAttribute('role', 'list');
-      mount.appendChild(grid);
+      container.appendChild(grid);
 
       const empty = document.createElement('p');
       empty.className = 'xp-empty';
       empty.dataset.empty = '';
       empty.textContent = 'No frames match that yet.';
       empty.hidden = true;
-      mount.appendChild(empty);
+      container.appendChild(empty);
 
       masonry = Masonry(grid);
       const items = photos.map((p, i) => {
@@ -1121,6 +1384,41 @@ Return exactly this JSON shape:
       requestAnimationFrame(() => items.forEach((it, i) =>
         setTimeout(() => it.el.classList.remove('xp-enter'), Math.min(i * 45, 600))));
 
+      // Re-apply any filter/search that was active before the rebuild.
+      if (queryActive()) applyFilter();
+    }
+
+    function build() {
+      mount.innerHTML = '';
+      const bar = toolbar();
+      mount.appendChild(bar);
+      renderFilters(bar);
+
+      const stage = document.createElement('div');
+      stage.className = 'xp-stage';
+      stage.dataset.view = view;
+      mount.appendChild(stage);
+
+      // mount.innerHTML above just detached whatever the previous layout
+      // built, so any existing masonry engine now points at dead DOM.
+      // Cleared unconditionally here; buildMasonry reassigns it when it
+      // actually builds one. (Missing this let a stale engine survive a
+      // Masonry→Discovery switch and silently swallow later filtering.)
+      masonry = null;
+
+      // Discovery is a curated browse of the whole archive, so it can't
+      // express "only photos matching X" — while a query is active we
+      // show the results in the grid instead, and return to the rails
+      // automatically once the query is cleared.
+      if (view === 'discovery') {
+        if (queryActive()) buildGrid(stage);
+        else buildDiscovery(stage);
+      } else if (view === 'grid') {
+        buildGrid(stage);
+      } else {
+        buildMasonry(stage);
+      }
+
       const onType = debounce(() => localSearch($('[data-search]', bar).value, bar), 220);
       $('[data-search]', bar).addEventListener('input', onType);
       $('[data-search]', bar).addEventListener('keydown', e => {
@@ -1130,6 +1428,27 @@ Return exactly this JSON shape:
     }
 
     /* ---- Detail view ---- */
+
+    /** Fetches and renders the "keep exploring" rails under a photograph.
+     *  Reuses the exact same rail renderer as the Discovery feed, so the
+     *  two surfaces stay visually and behaviourally identical. */
+    async function loadRecommendationRails(p, container) {
+      if (!container || !p || !p.id) return;
+      try {
+        const base = CFG.apiBase || 'http://localhost:4000/api';
+        const res = await fetch(`${base}/recommendations/${encodeURIComponent(p.id)}`,
+          { credentials: 'include' });
+        if (!res.ok) return;
+        const { rails } = await res.json();
+        if (!rails || !rails.length) return;
+        const frag = document.createDocumentFragment();
+        rails.forEach(r => frag.appendChild(renderRail(r)));
+        container.appendChild(frag);
+      } catch (e) {
+        /* offline / API down — the local related grid above still stands */
+      }
+    }
+
     function similar(p, n) {
       const base = p.vector || Vec.photoVector(p);
       return photos.filter(q => q.id !== p.id)
@@ -1211,6 +1530,8 @@ Return exactly this JSON shape:
                 <span class="xp-related-score">${Math.round(r.s * 100)}% match</span>
               </div>`).join('')}</div>
           </section>` : ''}
+
+          <div class="xp-recs" data-recs></div>
         </div>`;
 
       $$('[data-full]', detailMount).forEach(im => { im.src = im.dataset.full; });
@@ -1224,6 +1545,12 @@ Return exactly this JSON shape:
         c.onclick = go;
         c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
       });
+
+      // Server-side multi-signal rails (semantic + colour + EXIF + mood +
+      // GPS). Loaded after the page paints so the photograph itself is
+      // never waiting on them; silently skipped if the API is unreachable,
+      // leaving the local "Visually related" grid above as the fallback.
+      loadRecommendationRails(p, $('[data-recs]', detailMount));
 
       if (typeof root.go === 'function') root.go('photo');
       else {
@@ -1244,6 +1571,9 @@ Return exactly this JSON shape:
     }
 
     async function refresh() {
+      // The feed is memoised per page-load; drop it here so an upload or
+      // delete is reflected in the Discovery rails without a hard reload.
+      discoveryFeed = null;
       photos = (getPhotos() || []).slice();
       await Promise.all(photos.map(hydrate));
       photos.forEach(p => { p.vector = Vec.photoVector(p); });
@@ -1276,6 +1606,7 @@ Return exactly this JSON shape:
 
     return {
       init, refresh, showDetail, similar,
+      setView, get view() { return view; }, get views() { return VIEWS.slice(); },
       get photos() { return photos; },
       showGallery() {
         detailMount.style.display = 'none';
@@ -1354,7 +1685,9 @@ Return exactly this JSON shape:
     showDetail(p) { return Gallery.showDetail(p); },
     showGallery() { return Gallery.showGallery(); },
     ask(question, history) { return RAG.answer(question, history); },
-    similar(p, n) { return Gallery.similar(p, n); }
+    similar(p, n) { return Gallery.similar(p, n); },
+    setView(v) { return Gallery.setView(v); },
+    get view() { return Gallery.view; }
   };
 
   root.Exhibition = Exhibition;

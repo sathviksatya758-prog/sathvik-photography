@@ -1,0 +1,584 @@
+// ============================================================
+// schema.prisma — Postgres 16+ with pgvector
+// Ported from legacy/schema.sql, extended for JWT auth, chat
+// sessions, contact messages, favorites/collections, analytics
+// and audit logging.
+//
+// Vector columns use Unsupported(), since Prisma Client has no
+// native pgvector type. All embedding writes/reads go through
+// raw SQL in src/modules/search and src/modules/chat.
+// ============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector, pg_trgm, citext, uuid_ossp(map: "uuid-ossp")]
+}
+
+// ---------- Auth ----------
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email         String    @unique @db.Citext
+  username      String    @unique
+  passwordHash  String    @map("password_hash")
+  role          Role      @default(USER)
+  emailVerified Boolean   @default(false) @map("email_verified")
+  failedLogins  Int       @default(0) @map("failed_logins")
+  lockedUntil   DateTime? @map("locked_until") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastLoginAt   DateTime? @map("last_login_at") @db.Timestamptz
+
+  refreshTokens       RefreshToken[]
+  emailVerifications  EmailVerificationToken[]
+  passwordResets      PasswordResetToken[]
+  favorites           Favorite[]
+  collections         Collection[]
+  chatSessions        ChatSession[]
+  downloads           Download[]
+  auditLogs           AuditLog[]
+
+  @@map("users")
+}
+
+// Refresh tokens are stored hashed (SHA-256) — never the raw token.
+// Rotation: each refresh issues a new token and revokes the old one.
+model RefreshToken {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  userAgent  String?   @map("user_agent")
+  ip         String?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz
+  replacedBy String?   @map("replaced_by")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// ---------- Photographs ----------
+
+enum PhotoStatus {
+  PROCESSING
+  READY
+  FAILED
+  HIDDEN
+}
+
+model Photo {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  slug        String    @unique
+  storageKey  String    @map("storage_key")
+  width       Int?
+  height      Int?
+  aspect      Float?
+  bytes       BigInt?
+  mime        String?
+  lqip        String?
+  blurhash    String?
+  status      PhotoStatus @default(PROCESSING)
+  featured    Boolean   @default(false)
+  ownerNote   String?   @map("owner_note")
+  capturedAt  DateTime? @map("captured_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  exif        PhotoExif?
+  ai          PhotoAi?
+  critique    PhotoCritique?
+  renditions  PhotoRendition[]
+  terms       PhotoTerm[]
+  colors      PhotoColor[]
+  views       PhotoView[]
+  favorites   Favorite[]
+  downloads   Download[]
+  collections CollectionPhoto[]
+  chunks      KnowledgeChunk[]
+  suggestions PhotoSuggestion[] @relation("PhotoSuggestions")
+  duplicateSuggestionsOf PhotoSuggestion[] @relation("DuplicateOfPhoto")
+
+  @@index([createdAt(sort: Desc)], map: "photos_created_idx")
+  @@index([status], map: "photos_status_idx")
+  @@map("photos")
+}
+
+enum RenditionFormat {
+  avif
+  webp
+  jpeg
+}
+
+model PhotoRendition {
+  id         BigInt          @id @default(autoincrement())
+  photoId    String          @map("photo_id") @db.Uuid
+  format     RenditionFormat
+  width      Int
+  height     Int
+  bytes      BigInt?
+  storageKey String          @map("storage_key")
+
+  photo Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@unique([photoId, format, width])
+  @@index([photoId], map: "renditions_photo_idx")
+  @@map("photo_renditions")
+}
+
+model PhotoExif {
+  photoId      String    @id @map("photo_id") @db.Uuid
+  make         String?
+  model        String?
+  lens         String?
+  focalMm      Float?    @map("focal_mm")
+  focal35mm    Float?    @map("focal_35mm")
+  aperture     Float?
+  shutterSec   Float?    @map("shutter_sec")
+  iso          Int?
+  exposureBias Float?    @map("exposure_bias")
+  flash        String?
+  whiteBalance String?   @map("white_balance")
+  software     String?
+  takenAt      DateTime? @map("taken_at") @db.Timestamptz
+  gpsLat       Float?    @map("gps_lat")
+  gpsLon       Float?    @map("gps_lon")
+  placeName    String?   @map("place_name")
+  raw          Json?
+
+  photo Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@index([make, model], map: "exif_camera_idx")
+  @@map("photo_exif")
+}
+
+model PhotoAi {
+  photoId       String   @id @map("photo_id") @db.Uuid
+  // --- core (unchanged since the first backend pass) ---
+  // `title` was generated by the AI call from the start but had no column
+  // to land in — silently dropped. Fixed here rather than left broken.
+  title         String?
+  caption       String?
+  subject       String?
+  description   String?
+  altText       String?  @map("alt_text")
+  story         String?
+  mood          String?
+  composition   String?
+  lighting      String?
+  colorAnalysis String?  @map("color_analysis")
+  editingStyle  String?  @map("editing_style")
+  genre         String?
+  socialCaption String?  @map("social_caption")
+  technicalNote String?  @map("technical_note")
+  locationGuess String?  @map("location_guess")
+  modelVersion  String?  @map("model_version")
+  generatedAt   DateTime @default(now()) @map("generated_at") @db.Timestamptz
+
+  // --- expanded captioning ---
+  shortCaption     String?  @map("short_caption")
+  longCaption      String?  @map("long_caption")
+  sceneDescription String?  @map("scene_description")
+  colorHarmony     String?  @map("color_harmony")
+  cameraTechnique  String?  @map("camera_technique")
+  subjects         String[] @default([])
+  instagramCaption String?  @map("instagram_caption")
+  linkedinCaption  String?  @map("linkedin_caption")
+  twitterCaption   String?  @map("twitter_caption")
+
+  // --- AI-estimated scene/composition analysis (Claude's holistic
+  // judgment from the image, not a dedicated CV/object-detection model —
+  // see server/src/modules/uploads/ai.service.ts for the disclosure this
+  // is surfaced with) ---
+  sceneClassification String?  @map("scene_classification")
+  weatherEstimate      String?  @map("weather_estimate")
+  timeOfDayEstimate    String?  @map("time_of_day_estimate")
+  lightingQuality      String?  @map("lighting_quality")
+  ruleOfThirds         Boolean? @map("rule_of_thirds")
+  symmetryDetected     Boolean? @map("symmetry_detected")
+  leadingLines         Boolean? @map("leading_lines")
+  compositionScore     Int?     @map("composition_score")
+  qualityScore         Int?     @map("quality_score")
+
+  photo Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@map("photo_ai")
+}
+
+// On-demand editing feedback — deliberately NOT generated automatically
+// on every upload (that would double AI cost/latency on the upload path);
+// requested explicitly per photo via POST /api/photos/:id/critique.
+model PhotoCritique {
+  photoId                 String   @id @map("photo_id") @db.Uuid
+  exposure                String?
+  compositionImprovements String?  @map("composition_improvements")
+  croppingSuggestion      String?  @map("cropping_suggestion")
+  whiteBalance            String?  @map("white_balance")
+  sharpnessFeedback       String?  @map("sharpness_feedback")
+  noiseAnalysis           String?  @map("noise_analysis")
+  editingRecommendations  String?  @map("editing_recommendations")
+  modelVersion            String?  @map("model_version")
+  generatedAt             DateTime @default(now()) @map("generated_at") @db.Timestamptz
+
+  photo Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@map("photo_critiques")
+}
+
+enum SuggestionKind {
+  FEATURED
+  DUPLICATE
+  SIMILAR_GROUP
+  COLLECTION
+}
+
+enum SuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Additive auto-organization layer: the AI proposes, an admin disposes.
+// Deliberately separate from the existing auto-applied tags/categories
+// (PhotoTerm) so that already-working behavior is untouched — this only
+// covers suggestion types that didn't exist before (featured picks,
+// duplicate/similar flags).
+model PhotoSuggestion {
+  id            String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  photoId       String           @map("photo_id") @db.Uuid
+  kind          SuggestionKind
+  value         String?
+  duplicateOfId String?          @map("duplicate_of_id") @db.Uuid
+  confidence    Float?
+  status        SuggestionStatus @default(PENDING)
+  reviewedById  String?          @map("reviewed_by_id") @db.Uuid
+  reviewedAt    DateTime?        @map("reviewed_at") @db.Timestamptz
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  photo       Photo  @relation("PhotoSuggestions", fields: [photoId], references: [id], onDelete: Cascade)
+  duplicateOf Photo? @relation("DuplicateOfPhoto", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+
+  @@index([status, kind], map: "suggestions_status_idx")
+  @@index([photoId], map: "suggestions_photo_idx")
+  @@map("photo_suggestions")
+}
+
+enum TermKind {
+  tag
+  category
+  collection
+  seo
+  hashtag
+}
+
+model PhotoTerm {
+  id      BigInt   @id @default(autoincrement())
+  photoId String   @map("photo_id") @db.Uuid
+  kind    TermKind
+  value   String
+
+  photo Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@unique([photoId, kind, value])
+  @@index([kind, value], map: "terms_lookup_idx")
+  @@index([photoId], map: "terms_photo_idx")
+  @@map("photo_terms")
+}
+
+model PhotoColor {
+  id       BigInt @id @default(autoincrement())
+  photoId  String @map("photo_id") @db.Uuid
+  hex      String
+  r        Int?
+  g        Int?
+  b        Int?
+  share    Float
+  rank     Int
+
+  photo Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@unique([photoId, rank])
+  @@index([photoId], map: "colors_photo_idx")
+  @@map("photo_colors")
+}
+
+// 1536 dims — text-embedding-3-small. Written/read via raw SQL.
+model PhotoEmbedding {
+  photoId   String   @id @map("photo_id") @db.Uuid
+  embedding Unsupported("vector(1536)")
+  source    String   @default("caption+tags+story")
+  model     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("photo_embeddings")
+}
+
+enum KnowledgeKind {
+  bio
+  faq
+  photo
+  press
+  service
+}
+
+model KnowledgeChunk {
+  id        String                       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  kind      KnowledgeKind
+  title     String
+  body      String
+  photoId   String?                      @map("photo_id") @db.Uuid
+  embedding Unsupported("vector(1536)")?
+  tokenLen  Int?                         @map("token_len")
+  updatedAt DateTime                     @default(now()) @map("updated_at") @db.Timestamptz
+
+  photo Photo? @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@map("knowledge_chunks")
+}
+
+// ---------- Engagement ----------
+
+model Favorite {
+  userId    String   @map("user_id") @db.Uuid
+  photoId   String   @map("photo_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photo Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@id([userId, photoId])
+  @@index([photoId], map: "favorites_photo_idx")
+  @@map("favorites")
+}
+
+// The kind of manually-curated grouping. (AI-generated collections are
+// computed on the fly from photo metadata — see modules/discovery/taxonomy.ts
+// — and deliberately do NOT live in this table, so they can never go stale.)
+enum CollectionKind {
+  COLLECTION
+  ALBUM
+  PROJECT
+  STORY
+  JOURNAL
+  SEASONAL
+}
+
+model Collection {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  name        String
+  description String?
+  kind        CollectionKind @default(COLLECTION)
+  isPublic    Boolean  @default(false) @map("is_public")
+  featured    Boolean  @default(false)
+  coverPhotoId String? @map("cover_photo_id") @db.Uuid
+
+  // --- Client-gallery delivery ---
+  // shareSlug is the unguessable public URL segment. passwordHash is
+  // Argon2 like user passwords (never plaintext); expiresAt lets a
+  // delivered gallery lapse on its own.
+  shareSlug    String?   @unique @map("share_slug")
+  passwordHash String?   @map("password_hash")
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz
+  allowDownload Boolean  @default(true) @map("allow_download")
+  watermark     Boolean  @default(false)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photos CollectionPhoto[]
+
+  @@unique([userId, name])
+  @@index([shareSlug], map: "collections_share_idx")
+  @@map("collections")
+}
+
+model CollectionPhoto {
+  collectionId String   @map("collection_id") @db.Uuid
+  photoId      String   @map("photo_id") @db.Uuid
+  addedAt      DateTime @default(now()) @map("added_at") @db.Timestamptz
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  photo      Photo      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, photoId])
+  @@map("collection_photos")
+}
+
+model Download {
+  id        BigInt   @id @default(autoincrement())
+  photoId   String   @map("photo_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  rendition String?
+  ip        String?
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  photo Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([photoId], map: "downloads_photo_idx")
+  @@map("downloads")
+}
+
+// ---------- Chat / RAG ----------
+
+enum ChatRole {
+  user
+  assistant
+}
+
+model ChatSession {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages ChatMessage[]
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sessionId String   @map("session_id") @db.Uuid
+  role      ChatRole
+  content   String
+  sources   Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId], map: "chat_messages_session_idx")
+  @@map("chat_messages")
+}
+
+// ---------- Contact ----------
+
+enum ContactStatus {
+  NEW
+  READ
+  REPLIED
+  ARCHIVED
+}
+
+model ContactMessage {
+  id        String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name      String
+  email     String
+  subject   String?
+  message   String
+  status    ContactStatus @default(NEW)
+  ip        String?
+  userAgent String?       @map("user_agent")
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([status, createdAt(sort: Desc)], map: "contact_status_idx")
+  @@map("contact_messages")
+}
+
+// ---------- Analytics ----------
+
+model SearchLog {
+  id         BigInt   @id @default(autoincrement())
+  query      String
+  mode       String
+  resultIds  String[] @map("result_ids") @db.Uuid
+  latencyMs  Int?     @map("latency_ms")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("search_log")
+}
+
+model PhotoView {
+  id        BigInt   @id @default(autoincrement())
+  photoId   String?  @map("photo_id") @db.Uuid
+  referrer  String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  photo Photo? @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@index([photoId, createdAt(sort: Desc)], map: "views_photo_idx")
+  @@map("photo_views")
+}
+
+// General-purpose event stream backing the analytics dashboard
+// (page views, searches, chat opens, downloads, etc).
+model AnalyticsEvent {
+  id        BigInt   @id @default(autoincrement())
+  type      String
+  path      String?
+  photoId   String?  @map("photo_id") @db.Uuid
+  sessionId String?  @map("session_id")
+  ip        String?
+  userAgent String?  @map("user_agent")
+  referrer  String?
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([type, createdAt(sort: Desc)], map: "analytics_type_idx")
+  @@map("analytics_events")
+}
+
+// ---------- Audit ----------
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  meta       Json?
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId], map: "audit_actor_idx")
+  @@index([targetType, targetId], map: "audit_target_idx")
+  @@map("audit_logs")
+}

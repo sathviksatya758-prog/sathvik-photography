@@ -1161,7 +1161,13 @@ $('#cf-yes').onclick=async()=>{
   try{ await api('/photos/'+id,{method:'DELETE'}) }
   catch(err){ toast(err.message||'Could not remove frame'); return }
   state.photos=state.photos.filter(p=>p.id!==id);
+  // Refresh every surface the photo can appear on: the Work gallery
+  // (Exhibition — Discovery/Masonry/Grid), the upload queue, the hero count,
+  // and the homepage "archive" collection strip + stats (which are fed by the
+  // now cache-invalidated /discovery feed). Server-side the photo is already
+  // soft-deleted and excluded from all list endpoints.
   await Exhibition.refresh(); refreshHero(); renderQueue();
+  await initHomepageSections();
   toast('Frame removed');
 };
 function renderQueue(){
@@ -1484,7 +1490,9 @@ function countUp(el,target){
 function renderCollectionStrip(rows){
   const strip=$('#collections-strip'), section=$('#collections-section');
   const curated=rows.filter(r=>r.kind==='collection'&&r.photos.length).slice(0,8);
-  if(!curated.length)return;
+  // Clear and hide when nothing qualifies — otherwise deleting the last photo
+  // of a collection would leave a stale card behind on the homepage strip.
+  if(!curated.length){strip.innerHTML='';section.hidden=true;return;}
   strip.innerHTML=curated.map(r=>{
     const cover=r.photos[0];
     const set=(cover.urls&&cover.urls.jpeg)||'';

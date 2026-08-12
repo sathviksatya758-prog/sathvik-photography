@@ -23,6 +23,7 @@ import { favoritesRouter } from './modules/favorites/favorites.routes';
 import { collectionsRouter } from './modules/collections/collections.routes';
 import { discoveryRouter } from './modules/discovery/discovery.routes';
 import { recommendationsRouter } from './modules/recommendations/recommendations.routes';
+import { settingsRouter } from './modules/settings/settings.routes';
 
 export function createApp() {
   const app = express();
@@ -116,6 +117,7 @@ export function createApp() {
   app.use('/api/collections', collectionsRouter);
   app.use('/api/discovery', discoveryRouter);
   app.use('/api/recommendations', recommendationsRouter);
+  app.use('/api/settings', settingsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

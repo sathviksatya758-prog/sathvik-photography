@@ -582,3 +582,13 @@ model AuditLog {
   @@index([targetType, targetId], map: "audit_target_idx")
   @@map("audit_logs")
 }
+
+// Small key/value store for site-wide owner settings that aren't tied to a
+// single user (e.g. which photo is the homepage hero/intro image).
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("site_settings")
+}

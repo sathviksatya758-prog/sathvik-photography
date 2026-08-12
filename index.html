@@ -296,6 +296,8 @@ header.solid{mix-blend-mode:normal}
   font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);
   transition:background .3s,color .3s,border-color .3s}
 .rm:hover{background:var(--accent);color:var(--paper);border-color:var(--accent)}
+.rm.intro{margin-right:.4rem}
+.rm.intro:disabled{background:var(--accent);color:var(--paper);border-color:var(--accent);cursor:default;opacity:.85}
 
 /* The contact/footer band is a deliberate dark closing statement in the
    current design — kept fixed-dark in both themes rather than inverting
@@ -924,7 +926,7 @@ function trackEvent(type,extra){
 
 const state={page:'home',photos:[],user:null,authMode:'login',chatSessionId:null,
   chat:[{role:'assistant',content:"I'm Sathvik's studio assistant. Ask me about a photo in the archive, when he started, or how many he's taken so far."}],
-  chatBusy:false,pendingDelete:null};
+  chatBusy:false,pendingDelete:null,galleryDirty:false,heroPhoto:null};
 
 /* ---------- theme ---------- */
 // The <head> inline script already set data-theme before first paint
@@ -985,6 +987,12 @@ function go(page){
   if(page==='map')renderMap();
   else if(page==='dashboard')renderDashboard();
   else if(page==='galleries')renderGalleries();
+  else if(page==='home'&&state.galleryDirty){
+    // A photo was uploaded/removed while you were elsewhere — bring the Work
+    // gallery and homepage strip up to date now, on return, not mid-upload.
+    state.galleryDirty=false;
+    Exhibition.refresh(); initHomepageSections();
+  }
 }
 /* ---------- toast + progress ---------- */
 function toast(m){$('#toast-msg').textContent=m;const t=$('#toast');
@@ -1138,13 +1146,21 @@ async function handleFiles(files){
         finalPhoto.palette?finalPhoto.palette.colors.length+' colours':null,
         finalPhoto.ai&&finalPhoto.ai.tags?finalPhoto.ai.tags.length+' tags':null
       ].filter(Boolean).join(' · ');
+      const hero=document.createElement('button');
+      hero.className='rm intro';hero.textContent='Set as intro';hero.dataset.cursor='';
+      hero.onclick=()=>setHero(finalPhoto.id);
+      row.appendChild(hero);
       const rm=document.createElement('button');
       rm.className='rm';rm.textContent='Remove';rm.dataset.cursor='';
       rm.onclick=()=>askDelete(finalPhoto.id);
       row.appendChild(rm);
       progress(1);
-      await Exhibition.refresh();
+      // Don't rebuild the whole Work gallery on every uploaded file — that
+      // re-fetches /discovery and re-renders all tiles, which reads as the
+      // page "refreshing". Just update the cheap hero count and mark the
+      // gallery dirty; it rebuilds once, lazily, when you next open Work.
       refreshHero();
+      state.galleryDirty=true;
       toast('Frame added to the archive');
     }catch(err){
       $('[data-stage]',row).textContent='Failed — '+err.message;
@@ -1161,13 +1177,14 @@ $('#cf-yes').onclick=async()=>{
   try{ await api('/photos/'+id,{method:'DELETE'}) }
   catch(err){ toast(err.message||'Could not remove frame'); return }
   state.photos=state.photos.filter(p=>p.id!==id);
-  // Refresh every surface the photo can appear on: the Work gallery
-  // (Exhibition — Discovery/Masonry/Grid), the upload queue, the hero count,
-  // and the homepage "archive" collection strip + stats (which are fed by the
-  // now cache-invalidated /discovery feed). Server-side the photo is already
-  // soft-deleted and excluded from all list endpoints.
-  await Exhibition.refresh(); refreshHero(); renderQueue();
-  await initHomepageSections();
+  if(state.heroPhoto&&state.heroPhoto.id===id)state.heroPhoto=null; // deleted photo can't stay the hero
+  // The frame leaves the upload queue and hero count right away; the Work
+  // gallery + homepage "archive" strip (fed by the now cache-invalidated
+  // /discovery feed, which excludes soft-deleted photos) rebuild lazily when
+  // you next open Work — same deferred pattern as upload, so no mid-action
+  // full re-render.
+  refreshHero(); renderQueue();
+  state.galleryDirty=true;
   toast('Frame removed');
 };
 function renderQueue(){
@@ -1179,6 +1196,14 @@ function renderQueue(){
       <div class="s">${esc([p.exif&&p.exif.hasData?'EXIF':'No EXIF',
         p.palette?p.palette.colors.length+' colours':'',
         (p.ai&&p.ai.tags||[]).length+' tags'].filter(Boolean).join(' · '))}</div></div>`;
+    if(isOwner()){
+      const hero=document.createElement('button');
+      const isHero=state.heroPhoto&&state.heroPhoto.id===p.id;
+      hero.className='rm intro';hero.textContent=isHero?'Intro ✓':'Set as intro';hero.dataset.cursor='';
+      hero.disabled=!!isHero;
+      hero.onclick=()=>setHero(p.id);
+      row.appendChild(hero);
+    }
     const rm=document.createElement('button');
     rm.className='rm';rm.textContent='Remove';rm.dataset.cursor='';
     rm.onclick=()=>askDelete(p.id);row.appendChild(rm);
@@ -1186,10 +1211,34 @@ function renderQueue(){
   });
 }
 
-/* ---------- hero ---------- */
+/* ---------- hero / intro image ---------- */
+// Load the owner-chosen intro image (persisted server-side, shown to everyone).
+async function loadHero(){
+  try{
+    const r=await api('/settings/hero');
+    state.heroPhoto=(r&&r.hero)?adaptPhoto(r.hero):null;
+  }catch(e){ state.heroPhoto=null; }
+}
+// Owner action: make a photo the homepage intro image.
+async function setHero(id){
+  if(!isOwner()){ toast('Sign in as the archive owner'); return; }
+  try{
+    const r=await api('/settings/hero',{method:'PUT',body:{photoId:id}});
+    state.heroPhoto=(r&&r.hero)?adaptPhoto(r.hero):null;
+    refreshHero();
+    renderQueue();
+    toast('Set as intro image');
+  }catch(err){ toast(err.message||'Could not set intro image'); }
+}
 function refreshHero(){
   $('#count').textContent=String(state.photos.length).padStart(2,'0');
-  const p=state.photos[0]; if(!p)return;
+  // The intro/hero image below the heading: the owner's chosen photo if one is
+  // set (state.heroPhoto, persisted server-side and shown to every visitor),
+  // otherwise the most recent frame. Prefer the copy in state.photos so it
+  // stays in sync, but fall back to the standalone heroPhoto object in case
+  // it isn't among the loaded 60.
+  const p=(state.heroPhoto&&(state.photos.find(x=>x.id===state.heroPhoto.id)||state.heroPhoto))||state.photos[0];
+  if(!p)return;
   $('#feature-img').src=p.url;
   $('#feature-img').alt=(p.ai&&p.ai.altText)||'Featured photograph';
   // AI-generated long-form description for screen readers — altText is a
@@ -2038,6 +2087,7 @@ async function renderSharedGallery(slug){
   try{ const {user}=await api('/auth/me'); state.user=user }catch(e){ /* not signed in */ }
   renderNav();
   state.photos=await load();
+  await loadHero();
   await Exhibition.init({
     mount:'#gallery',
     detailMount:'#page-photo',

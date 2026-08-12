@@ -23,10 +23,10 @@
  *   npm run admin:reset-link -- you@example.com http://127.0.0.1:5500
  */
 import fs from 'node:fs';
-import path from 'node:path';
 import { prisma } from '../src/lib/prisma';
 import { env } from '../src/config/env';
 import { generateToken, hashToken } from '../src/utils/tokens';
+import { DEV_LINK_FILE } from '../src/utils/devResetLink';
 
 const RESET_TTL_MS = 60 * 60_000; // mirrors auth.service.ts
 
@@ -50,13 +50,16 @@ async function main() {
   });
 
   const url = `${base}/?reset=${token}`;
-  const outFile = path.resolve(process.cwd(), '.reset-link.txt');
+  const outFile = DEV_LINK_FILE; // same gitignored file the dev fallback uses
   fs.writeFileSync(outFile, url + '\n', { encoding: 'utf8' });
 
   // Print everything EXCEPT the token itself, so the secret lives only in the
   // gitignored file the operator opens locally.
   console.log('Reset link created for an existing account.');
-  console.log(`  account : ${user.username} (role ${user.role}${user.lockedUntil ? ', currently lockout-flagged' : ''})`);
+  // Only report a lockout that is still in effect — a past lockedUntil has
+  // already elapsed and no longer blocks sign-in.
+  const lockActive = !!(user.lockedUntil && user.lockedUntil > new Date());
+  console.log(`  account : ${user.username} (role ${user.role}${lockActive ? ', lockout active — completing this reset clears it' : ''})`);
   console.log(`  expires : 1 hour, single use`);
   console.log(`  link    : ${base}/?reset=<token hidden — see file>`);
   console.log(`  saved to: ${outFile}`);

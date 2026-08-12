@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { hashPassword, verifyPassword, passwordStrength } from '../../utils/password';
 import { generateToken, hashToken } from '../../utils/tokens';
+import { writeDevResetLink } from '../../utils/devResetLink';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, ttlToMs } from '../../utils/jwt';
 import { setAccessCookie, setRefreshCookie, clearAuthCookies } from '../../utils/cookies';
 import { sendMail, verifyEmailTemplate, resetPasswordTemplate } from '../../lib/mailer';
@@ -205,6 +206,10 @@ export async function forgotPassword(email: string): Promise<void> {
   });
   const link = `${env.CLIENT_ORIGIN}/?reset=${token}`;
   await sendMail({ to: user.email, ...resetPasswordTemplate(link) });
+  // Local dev only (no SMTP => the mail above was merely logged): drop the
+  // link into a gitignored file so the flow is actually completable. No-ops in
+  // production and whenever SMTP is configured. Never part of the response.
+  writeDevResetLink(link);
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<void> {

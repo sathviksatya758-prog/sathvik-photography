@@ -1492,6 +1492,12 @@ Return exactly this JSON shape:
                 ai.hashtags.slice(0, 8).map(t => `<span class="xp-tag hash">#${esc(t)}</span>`).join('')}</div>` : ''}
             </div>
             <aside>
+              <div class="xp-panel xp-ai-ask">
+                <div class="xp-panel-h"><span>Ask AI</span><span>Description</span></div>
+                <p class="xp-analysis-v" data-ai-hint>Generate a comprehensive description of this photograph from its real data.</p>
+                <button class="xp-ai-btn" data-ask-ai>Generate description</button>
+                <p class="xp-ai-out" data-ai-out></p>
+              </div>
               ${exifCells.length ? `<div class="xp-panel">
                 <div class="xp-panel-h"><span>Camera data</span><span>EXIF</span></div>
                 <div class="xp-exif-grid">${exifCells.map(c =>
@@ -1537,6 +1543,35 @@ Return exactly this JSON shape:
       $$('[data-full]', detailMount).forEach(im => { im.src = im.dataset.full; });
       const back = $('[data-back]', detailMount);
       if (back) back.onclick = () => root.Exhibition.showGallery();
+
+      // "Ask AI" — on demand, generate a comprehensive description of this
+      // photograph from its real data. GET (idempotent, cached server-side),
+      // so no CSRF token is needed; works for any visitor.
+      const askBtn = $('[data-ask-ai]', detailMount);
+      if (askBtn) {
+        askBtn.onclick = async () => {
+          const out = $('[data-ai-out]', detailMount);
+          const hint = $('[data-ai-hint]', detailMount);
+          askBtn.disabled = true;
+          const label = askBtn.textContent;
+          askBtn.textContent = 'Generating…';
+          if (out) out.textContent = '';
+          try {
+            const base = CFG.apiBase || 'http://localhost:4000/api';
+            const res = await fetch(`${base}/photos/${encodeURIComponent(p.id)}/describe`, { credentials: 'include' });
+            if (!res.ok) throw new Error('describe failed');
+            const data = await res.json();
+            if (hint) hint.style.display = 'none';
+            if (out) out.textContent = data.description || 'No description available.';
+            askBtn.textContent = 'Regenerate';
+          } catch (e) {
+            if (out) out.textContent = 'Could not generate a description right now — the server may be offline.';
+            askBtn.textContent = label;
+          } finally {
+            askBtn.disabled = false;
+          }
+        };
+      }
       $$('[data-rel]', detailMount).forEach(c => {
         const go = () => {
           const q = photos.find(z => z.id === c.dataset.rel);

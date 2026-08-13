@@ -23,8 +23,26 @@ function logCapabilities() {
   }
 }
 
+// Serverless Postgres (e.g. Neon free tier) auto-suspends when idle and takes
+// a few seconds to wake on the next connection — the first attempt often times
+// out. Retry a few times so a cold database doesn't kill the whole server at
+// startup instead of just waiting for it to come up.
+async function connectWithRetry(attempts = 6, delayMs = 4000) {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      await prisma.$connect();
+      if (i > 1) logger.info(`database connected on attempt ${i}`);
+      return;
+    } catch (err) {
+      if (i === attempts) throw err;
+      logger.warn(`database not reachable (attempt ${i}/${attempts}) — retrying in ${delayMs}ms`);
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+}
+
 async function main() {
-  await prisma.$connect();
+  await connectWithRetry();
   await seedDefaultKnowledgeIfEmpty().catch(err => logger.warn({ err }, 'knowledge seed skipped'));
 
   const app = createApp();

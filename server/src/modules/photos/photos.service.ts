@@ -2,7 +2,7 @@ import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { cached, cacheDel } from '../../lib/redis';
 import { recordAudit } from '../admin/audit.service';
-import { renditionUrl, withMediaPublic, groupTerms } from '../../lib/media';
+import { renditionUrl, withMediaPublic, groupTerms, availableWidths } from '../../lib/media';
 
 export async function listPhotos(opts: { limit: number; cursor?: string; category?: string }) {
   const cacheKey = `photos:list:${opts.limit}:${opts.cursor ?? ''}:${opts.category ?? ''}`;
@@ -58,6 +58,20 @@ export async function getPhotoBySlug(slug: string, referrer?: string) {
   };
 }
 
+// Owner-set display title/name for a photo. Empty/blank clears it (reverts to
+// the AI caption / "Untitled" in the UI).
+export async function updatePhotoTitle(id: string, title: string | null, actorId: string) {
+  const photo = await prisma.photo.findUnique({ where: { id } });
+  if (!photo || photo.deletedAt) throw AppError.notFound('Photo not found');
+  const clean = title && title.trim() ? title.trim().slice(0, 160) : null;
+  const updated = await prisma.photo.update({ where: { id }, data: { title: clean } });
+  await recordAudit({ actorId, action: 'photo.title', targetType: 'photo', targetId: id });
+  await cacheDel('photos:list:*');
+  await cacheDel(`photo:${id}`);
+  await cacheDel('discovery:*');
+  return { id: updated.id, title: updated.title };
+}
+
 export async function deletePhoto(id: string, actorId: string): Promise<void> {
   const photo = await prisma.photo.findUnique({ where: { id } });
   if (!photo || photo.deletedAt) throw AppError.notFound('Photo not found');
@@ -83,5 +97,8 @@ export async function recordDownload(
     data: { photoId, rendition, userId: meta.userId, ip: meta.ip, userAgent: meta.userAgent }
   });
 
-  return renditionUrl(photo.slug, 'jpeg', 2048);
+  // Largest rendition that was actually generated for this photo (a sub-2048
+  // upload never gets a 2048 rendition — see availableWidths/imagePipeline).
+  const widths = availableWidths(photo.width);
+  return renditionUrl(photo.slug, 'jpeg', widths[widths.length - 1]);
 }

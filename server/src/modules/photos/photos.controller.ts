@@ -4,6 +4,7 @@ import * as photosService from './photos.service';
 import { downloadQuerySchema } from './photos.schema';
 import { recordEvent } from '../analytics/analytics.service';
 import { getOrGenerateCritique } from './critique.service';
+import { describePhoto } from './describe.service';
 
 export const listPhotosHandler = asyncHandler(async (req, res) => {
   const { limit, cursor, category } = req.query as unknown as { limit: number; cursor?: string; category?: string };
@@ -38,4 +39,16 @@ export const downloadPhotoHandler = asyncHandler(async (req, res) => {
 export const critiquePhotoHandler = asyncHandler(async (req, res) => {
   const critique = await getOrGenerateCritique(req.params.id, req.query.regenerate === 'true');
   res.json({ critique });
+});
+
+export const updatePhotoTitleHandler = asyncHandler(async (req, res) => {
+  if (!req.user) throw AppError.unauthorized();
+  const { title } = req.body as { title: string | null };
+  const result = await photosService.updatePhotoTitle(req.params.id, title ?? null, req.user.sub);
+  res.json(result);
+});
+
+export const describePhotoHandler = asyncHandler(async (req, res) => {
+  const result = await describePhoto(req.params.id);
+  res.json(result);
 });

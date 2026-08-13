@@ -290,6 +290,12 @@ header.solid{mix-blend-mode:normal}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .queue-row .s{font-family:var(--mono);font-size:.58rem;letter-spacing:.14em;
   text-transform:uppercase;color:var(--mute);margin-top:3px}
+.queue-row .q-title{width:100%;background:transparent;border:1px solid transparent;border-radius:5px;
+  padding:.2rem .35rem;margin:-.2rem -.35rem;font-family:var(--serif);font-style:italic;font-size:.95rem;
+  color:var(--ink);transition:border-color .2s,background .2s}
+.queue-row .q-title::placeholder{font-style:normal;color:var(--mute);opacity:.8}
+.queue-row .q-title:hover{border-color:var(--rule)}
+.queue-row .q-title:focus{border-color:var(--accent);background:var(--paper);outline:none}
 .bar{height:2px;background:var(--rule);border-radius:2px;margin-top:.4rem;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .4s ease}
 .rm{padding:.35rem .75rem;border:1px solid var(--rule);border-radius:6px;font-family:var(--mono);
@@ -721,7 +727,7 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
         <div class="section-label"><b>03 ·</b> About</div>
         <div class="about-grid">
           <div class="about-photo">
-            <img src="" alt="Photographer at work in the field"/>
+            <img src="assets/about-portrait.jpg" alt="Portrait of Katnam Sathvik"/>
           </div>
           <div class="about-text">
             <h2>I'm Katnam Sathvik — a photographer who believes <em>everything breathes</em>.</h2>
@@ -1039,7 +1045,11 @@ function adaptPhoto(p){
     exif:adaptExif(p.exif),
     palette:{colors:(p.colors||[]).map(c=>({hex:c.hex,r:c.r,g:c.g,b:c.b,share:c.share}))},
     featured:!!p.featured,
-    ai:p.ai?{caption:p.ai.caption,title:p.ai.title,subject:p.ai.subject,description:p.ai.description,
+    // Owner-set display title. When present it drives the caption everywhere
+    // (gallery tiles, lightbox, detail heading, hero) so it's the name users
+    // see for the photo.
+    title:p.title||'',
+    ai:p.ai?{caption:p.title||p.ai.caption,title:p.ai.title,subject:p.ai.subject,description:p.ai.description,
       // Screen-reader text prefers the most descriptive field available —
       // altText is purpose-written for this, but fall back gracefully.
       altText:p.ai.altText||p.ai.longCaption||p.ai.sceneDescription||p.ai.caption||'Photograph',
@@ -1054,7 +1064,8 @@ function adaptPhoto(p){
       lightingQuality:p.ai.lightingQuality,ruleOfThirds:p.ai.ruleOfThirds,
       symmetryDetected:p.ai.symmetryDetected,leadingLines:p.ai.leadingLines,
       compositionScore:p.ai.compositionScore,qualityScore:p.ai.qualityScore,
-      tags:(p.terms&&p.terms.tags)||[],categories:(p.terms&&p.terms.categories)||[]}:null
+      tags:(p.terms&&p.terms.tags)||[],categories:(p.terms&&p.terms.categories)||[]}
+      :(p.title?{caption:p.title,altText:p.title,tags:[],categories:[]}:null)
   };
 }
 async function load(){
@@ -1189,14 +1200,22 @@ $('#cf-yes').onclick=async()=>{
 };
 function renderQueue(){
   const q=$('#queue');q.innerHTML='';
+  const owner=isOwner();
   state.photos.forEach(p=>{
     const row=document.createElement('div');row.className='queue-row';
     row.innerHTML=`<img src="${esc(p.lqip||p.url)}" alt=""/><div class="meta">
-      <div class="t">${esc((p.ai&&p.ai.caption)||'Untitled')}</div>
+      ${owner
+        ? `<input class="q-title" type="text" value="${esc(p.title||'')}" placeholder="Add a title…" maxlength="160" aria-label="Photo title"/>`
+        : `<div class="t">${esc((p.ai&&p.ai.caption)||'Untitled')}</div>`}
       <div class="s">${esc([p.exif&&p.exif.hasData?'EXIF':'No EXIF',
         p.palette?p.palette.colors.length+' colours':'',
         (p.ai&&p.ai.tags||[]).length+' tags'].filter(Boolean).join(' · '))}</div></div>`;
-    if(isOwner()){
+    const ti=$('.q-title',row);
+    if(ti){
+      ti.addEventListener('change',()=>saveTitle(p.id,ti.value));
+      ti.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ti.blur();}});
+    }
+    if(owner){
       const hero=document.createElement('button');
       const isHero=state.heroPhoto&&state.heroPhoto.id===p.id;
       hero.className='rm intro';hero.textContent=isHero?'Intro ✓':'Set as intro';hero.dataset.cursor='';
@@ -1209,6 +1228,23 @@ function renderQueue(){
     rm.onclick=()=>askDelete(p.id);row.appendChild(rm);
     q.appendChild(row);
   });
+}
+
+/* ---------- title editing ---------- */
+// Owner sets a display name for a photo; it becomes the caption users see
+// across the gallery, lightbox, detail heading and hero.
+async function saveTitle(id,value){
+  try{
+    const r=await api('/photos/'+id,{method:'PATCH',body:{title:value}});
+    const t=(r&&r.title)||'';
+    const apply=p=>{ if(!p)return; p.title=t;
+      if(p.ai){ p.ai.caption=t||p.ai.title||p.ai.caption; }
+      else if(t){ p.ai={caption:t,altText:t,tags:[],categories:[]}; } };
+    apply(state.photos.find(x=>x.id===id));
+    if(state.heroPhoto&&state.heroPhoto.id===id)apply(state.heroPhoto);
+    state.galleryDirty=true; refreshHero();
+    toast(t?'Title saved':'Title cleared');
+  }catch(err){ toast(err.message||'Could not save title'); }
 }
 
 /* ---------- hero / intro image ---------- */

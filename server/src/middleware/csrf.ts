@@ -20,7 +20,9 @@ export function ensureCsrfCookie(req: Request, res: Response, next: NextFunction
     res.cookie(COOKIE_NAME, token, {
       httpOnly: false,
       secure: env.COOKIE_SECURE,
-      sameSite: 'lax',
+      // See utils/cookies.ts — same None-when-Secure reasoning; this app is
+      // also mirrored on GitHub Pages, a different site from the API.
+      sameSite: env.COOKIE_SECURE ? 'none' : 'lax',
       domain: env.COOKIE_DOMAIN,
       path: '/'
     });

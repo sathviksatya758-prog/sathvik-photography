@@ -45,7 +45,9 @@ export function createApp() {
   // port, or 127.0.0.1 vs localhost), which the browser surfaces only as
   // an opaque "Failed to fetch". So: allow the configured origin(s), and
   // in development additionally reflect any localhost/127.0.0.1 origin.
-  const allowedOrigins = new Set([env.CLIENT_ORIGIN, env.API_BASE_URL]);
+  const allowedOrigins = new Set(
+    [env.CLIENT_ORIGIN, env.API_BASE_URL, env.EXTRA_CLIENT_ORIGIN].filter((o): o is string => Boolean(o))
+  );
   const isLocalOrigin = (origin: string): boolean => {
     try {
       const h = new URL(origin).hostname;

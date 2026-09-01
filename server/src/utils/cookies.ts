@@ -2,10 +2,17 @@ import type { Response } from 'express';
 import { env } from '../config/env';
 import { ttlToMs } from './jwt';
 
+// SameSite=Lax cookies aren't sent on cross-site fetch/XHR at all (only on
+// top-level GET navigation) — fine when the frontend and API share a site
+// (the Vercel deploy), but this app is also mirrored on GitHub Pages, a
+// genuinely different site from the API's domain. The actual CSRF defense
+// here is the double-submit token (see middleware/csrf.ts), not SameSite,
+// so relaxing to None costs nothing once already on HTTPS (None requires
+// Secure) and lets auth work from either frontend.
 const baseCookie = {
   httpOnly: true as const,
   secure: env.COOKIE_SECURE,
-  sameSite: 'lax' as const,
+  sameSite: (env.COOKIE_SECURE ? 'none' : 'lax') as 'none' | 'lax',
   domain: env.COOKIE_DOMAIN,
   path: '/'
 };

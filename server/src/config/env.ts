@@ -29,6 +29,10 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().default(4000),
   API_BASE_URL: z.string().url().default('http://localhost:4000'),
   CLIENT_ORIGIN: z.string().min(1).default('http://localhost:8080'),
+  // A second frontend origin to allow credentialed CORS requests from — this
+  // app is mirrored on GitHub Pages (a different site from the API), in
+  // addition to its primary origin at CLIENT_ORIGIN.
+  EXTRA_CLIENT_ORIGIN: optional(),
 
   DATABASE_URL: z.string().min(1),
   REDIS_URL: optional(),

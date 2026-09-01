@@ -768,9 +768,15 @@ const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 // Deployed: frontend and API are served from the one Vercel project/domain
 // (see /api/index.ts and vercel.json), so same-origin, no port, is correct.
 // An explicit window.API_BASE_URL always wins over both of the above.
+// GitHub Pages serves this same file from a github.io origin, which has no
+// backend of its own — point it at the real API on Vercel instead of trying
+// (and failing) to call itself same-origin.
+const GITHUB_PAGES_API_BASE='https://sathvik-photography.vercel.app';
 const API_BASE=(window.API_BASE_URL||(
   ['localhost','127.0.0.1','[::1]'].includes(location.hostname)
     ? location.protocol+'//'+location.hostname+':4000'
+    : location.hostname.endsWith('.github.io')
+    ? GITHUB_PAGES_API_BASE
     : location.origin
 ))+'/api';
 // exhibition.js's own AI module only uses this for the "Ask AI" semantic

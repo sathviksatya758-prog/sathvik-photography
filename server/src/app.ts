@@ -86,7 +86,7 @@ export function createApp() {
   // local disk (see lib/storage.ts) and are served from here. In production
   // you'd put a real object store + CDN in front instead; this exists so the
   // upload pipeline works with zero external storage setup.
-  if (!caps.s3) {
+  if (!caps.s3 && !caps.blob) {
     app.use(
       '/media',
       express.static(LOCAL_STORAGE_ROOT, {

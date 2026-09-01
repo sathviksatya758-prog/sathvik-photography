@@ -1,4 +1,5 @@
 import { Queue } from 'bullmq';
+import { waitUntil } from '@vercel/functions';
 import { queueRedis } from './redis';
 import { caps } from '../config/env';
 import { logger } from './logger';
@@ -47,14 +48,25 @@ export async function enqueueImageJob(data: ImageJobData): Promise<void> {
   }
 
   // imageProcessor only imports a *type* from this file, so the static import
-  // above is not a runtime cycle. Run in the background so the upload request
-  // (already 202'd with a PROCESSING status) returns immediately.
-  setImmediate(async () => {
+  // above is not a runtime cycle.
+  const run = async () => {
     try {
       await processImageJob(data);
     } catch (err) {
       logger.error({ err, photoId: data.photoId }, 'inline image job failed');
       await prisma.photo.update({ where: { id: data.photoId }, data: { status: 'FAILED' } }).catch(() => {});
     }
-  });
+  };
+
+  // On Vercel, a serverless function is frozen almost immediately after the
+  // response is sent — plain setImmediate work scheduled after that point is
+  // not guaranteed to run. waitUntil() keeps the function alive until the
+  // promise settles (bounded by the function's own max duration) without
+  // delaying the response itself. Elsewhere (local dev, the standalone
+  // worker's host process), keep the plain fire-and-forget behavior.
+  if (process.env.VERCEL) {
+    waitUntil(run());
+  } else {
+    setImmediate(run);
+  }
 }

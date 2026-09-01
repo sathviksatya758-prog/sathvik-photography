@@ -55,6 +55,15 @@ const EnvSchema = z.object({
   CDN_BASE: optional(),
   LOCAL_STORAGE_DIR: z.string().default('storage'),
 
+  // Vercel Blob — the storage driver used in production on Vercel, where
+  // there's no writable local disk to fall back to. BLOB_READ_WRITE_TOKEN is
+  // auto-injected once a Blob store is connected to the project;
+  // BLOB_BASE_URL is the store's public base (captured once at provisioning
+  // time, since it isn't derivable from the token) so publicUrl() can build
+  // URLs synchronously without a network round-trip.
+  BLOB_READ_WRITE_TOKEN: optional(),
+  BLOB_BASE_URL: optional(),
+
   ANTHROPIC_API_KEY: optional(),
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-5'),
   OPENAI_API_KEY: optional(),
@@ -86,6 +95,7 @@ export const isProd = env.NODE_ENV === 'production';
 // exactly one place.
 export const caps = {
   redis: Boolean(env.REDIS_URL),
+  blob: Boolean(env.BLOB_READ_WRITE_TOKEN && env.BLOB_BASE_URL),
   s3: Boolean(env.S3_BUCKET && env.S3_KEY && env.S3_SECRET),
   anthropic: Boolean(env.ANTHROPIC_API_KEY),
   openai: Boolean(env.OPENAI_API_KEY),

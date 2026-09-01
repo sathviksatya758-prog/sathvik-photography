@@ -1,3 +1,19 @@
-server/
 docs/
 .git/
+node_modules
+node_modules.bak
+
+# server/ itself IS needed now (the /api function lives in server/api and
+# imports server/src) — only exclude what shouldn't leave this machine or
+# doesn't belong in the deployment: local-only build output, native
+# node_modules built for Windows (Vercel installs its own on Linux), the
+# real secrets file, dev-only local disk storage, and logs.
+server/node_modules
+server/dist
+server/storage
+server/.env
+server/.env.example
+server/err.log
+server/.reset-link.txt
+server/legacy
+server/coverage

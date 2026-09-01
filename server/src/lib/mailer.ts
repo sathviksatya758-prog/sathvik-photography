@@ -51,10 +51,22 @@ export function resetPasswordTemplate(link: string) {
   };
 }
 
+// Contact form fields are public, unauthenticated user input that ends up
+// interpolated into an HTML email — without escaping, a visitor could inject
+// markup/links into the notification the owner reads (HTML injection).
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function contactNotificationTemplate(msg: { name: string; email: string; subject?: string | null; message: string }) {
   return {
     subject: `New contact message${msg.subject ? `: ${msg.subject}` : ''}`,
     text: `From: ${msg.name} <${msg.email}>\n\n${msg.message}`,
-    html: `<p><strong>From:</strong> ${msg.name} &lt;${msg.email}&gt;</p><p>${msg.message.replace(/\n/g, '<br/>')}</p>`
+    html: `<p><strong>From:</strong> ${escapeHtml(msg.name)} &lt;${escapeHtml(msg.email)}&gt;</p><p>${escapeHtml(msg.message).replace(/\n/g, '<br/>')}</p>`
   };
 }

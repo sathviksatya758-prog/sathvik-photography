@@ -427,7 +427,7 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
   font-family:var(--mono);font-size:.6rem;letter-spacing:.15em;text-transform:uppercase}
 
 /* ============================================================
-   Map / Dashboard / Galleries / Shared-gallery screens
+   Dashboard screen
    All colours are theme tokens so both light & dark work. Charts
    are single-hue magnitude bars in the site accent (dataviz: one
    series → one hue, value direct-labelled).
@@ -435,52 +435,13 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
 .nav-admin .n{color:var(--accent)}
 
 /* ---- shared bits ---- */
-.dash-empty,.map-loading,.dash-loading,.gal-loading,.shared-loading{
+.dash-empty,.dash-loading{
   font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;color:var(--mute);padding:1.4rem 0}
 .dash-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:2rem}
-.btn-refresh,.btn-solid.gal-new-btn{padding:.5rem 1.1rem;border:1px solid var(--rule);border-radius:30px;
+.btn-refresh{padding:.5rem 1.1rem;border:1px solid var(--rule);border-radius:30px;
   font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);
   background:transparent;transition:background .3s,color .3s,border-color .3s}
 .btn-refresh:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-
-/* ---- Map ---- */
-.map-head{display:flex;justify-content:space-between;align-items:flex-end;gap:1.5rem;flex-wrap:wrap;margin-bottom:1.4rem}
-.map-lede{font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--ink-2);max-width:44ch;line-height:1.5}
-.map-controls{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}
-.seg{display:flex;border:1px solid var(--rule);border-radius:30px;overflow:hidden}
-.seg-btn{padding:.42rem .9rem;background:transparent;color:var(--ink-2);font-family:var(--mono);font-size:.58rem;
-  letter-spacing:.12em;text-transform:uppercase;transition:background .3s,color .3s}
-.seg-btn.on{background:var(--ink);color:var(--paper)}
-.map-toggle{padding:.42rem .9rem;border:1px solid var(--rule);border-radius:30px;background:transparent;
-  color:var(--ink-2);font-family:var(--mono);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;
-  transition:background .3s,color .3s,border-color .3s}
-.map-toggle.on{background:var(--accent);color:var(--paper-fixed);border-color:var(--accent)}
-.map-years{font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);
-  display:flex;align-items:center;gap:.4rem}
-.map-years select{border:1px solid var(--rule);border-radius:6px;padding:.3rem .4rem;background:var(--paper-2);
-  color:var(--ink);font-family:var(--mono);font-size:.62rem}
-.map-canvas{position:relative;border:1px solid var(--rule);border-radius:8px;overflow:hidden;
-  background:var(--paper-2);aspect-ratio:2/1;max-height:70vh}
-.map-canvas svg{width:100%;height:100%;display:block}
-.graticule line{stroke:var(--rule);stroke-width:.3;opacity:.7}
-.graticule .equator{stroke:var(--mute);stroke-width:.4;opacity:.6}
-.heat{display:none}
-.heat circle{fill:var(--accent)}
-.map-canvas.heat-on .heat{display:block}
-.marker{fill:var(--accent);stroke:var(--paper-fixed);stroke-width:.5;cursor:pointer;
-  transition:fill .2s,r .2s;opacity:.9}
-.marker:hover,.marker:focus-visible{fill:var(--ink);outline:none}
-.marker:focus-visible{stroke:var(--accent);stroke-width:1}
-.map-panel{margin-top:1.4rem;border:1px solid var(--rule);border-radius:8px;padding:1.2rem;background:var(--paper-2)}
-.map-panel-head{display:flex;align-items:baseline;gap:1rem;margin-bottom:1rem}
-.map-panel-head h3{font-family:var(--serif);font-style:italic;font-size:1.3rem}
-.map-panel-head span{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
-.map-panel-x{margin-left:auto;font-size:1.4rem;color:var(--mute);line-height:1}
-.map-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.5rem}
-.map-thumb{aspect-ratio:1;border-radius:4px;overflow:hidden;cursor:pointer;background:var(--paper)}
-.map-thumb img{width:100%;height:100%;object-fit:cover;transition:transform .5s var(--ease)}
-.map-thumb:hover img{transform:scale(1.08)}
-.map-thumb:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ---- Dashboard ---- */
 .dash-narrative{font-family:var(--serif);font-style:italic;font-size:1.25rem;line-height:1.55;color:var(--ink-2);
@@ -512,75 +473,9 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
 .dash-foot{font-family:var(--mono);font-size:.54rem;letter-spacing:.15em;text-transform:uppercase;
   color:var(--mute);margin-top:2.2rem;text-align:right}
 
-/* ---- Galleries management ---- */
-.gal-create{border:1px solid var(--rule);border-radius:8px;padding:1.3rem;background:var(--paper-2);margin-bottom:1.8rem;max-width:520px}
-.gal-create-row{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin-top:.4rem}
-.gal-create-row select{border:1px solid var(--rule);border-radius:8px;padding:.6rem .7rem;background:var(--paper);color:var(--ink);font-size:.85rem}
-.gal-check{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.6rem;
-  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
-.gal-list{display:flex;flex-direction:column;gap:1rem}
-.gal-card{border:1px solid var(--rule);border-radius:8px;padding:1.2rem 1.3rem;background:var(--paper-2)}
-.gal-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
-.gal-card h3{font-family:var(--serif);font-style:italic;font-size:1.35rem;line-height:1.2}
-.gal-meta{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.5rem;
-  font-family:var(--mono);font-size:.56rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
-.gal-badge{padding:.15rem .5rem;border-radius:12px;border:1px solid var(--rule)}
-.gal-badge.live{border-color:var(--accent);color:var(--accent)}
-.gal-badge.warn{border-color:var(--mute)}
-.gal-actions{display:flex;gap:.4rem;flex-wrap:wrap}
-.gal-desc{font-size:.9rem;color:var(--ink-2);margin-top:.8rem;max-width:60ch;line-height:1.5}
-.gal-share,.gal-picker{margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid var(--rule)}
-.share-url{display:flex;gap:.5rem;margin-bottom:1rem}
-.share-url input{flex:1;border:1px solid var(--rule);border-radius:6px;padding:.55rem .7rem;background:var(--paper);
-  color:var(--ink);font-family:var(--mono);font-size:.72rem}
-.share-opts{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.9rem}
-.share-opts .fld span{display:block;font-family:var(--mono);font-size:.54rem;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--mute);margin-bottom:.3rem}
-.share-opts input{width:100%;border:1px solid var(--rule);border-radius:6px;padding:.55rem .7rem;
-  background:var(--paper);color:var(--ink);font-size:.85rem}
-.share-toggles{display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem}
-.share-actions{display:flex;gap:.6rem;align-items:center}
-.picker-hint{font-family:var(--mono);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:.8rem}
-.picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:.4rem;max-height:340px;overflow-y:auto;padding:.2rem}
-.picker-item{position:relative;aspect-ratio:1;border-radius:4px;overflow:hidden;cursor:pointer;background:var(--paper);opacity:.85}
-.picker-item img{width:100%;height:100%;object-fit:cover}
-.picker-item .picker-check{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  background:rgba(193,54,31,.55);color:#fff;font-size:1.2rem;opacity:0;transition:opacity .2s}
-.picker-item[aria-pressed="true"]{opacity:1;outline:2px solid var(--accent);outline-offset:-2px}
-.picker-item[aria-pressed="true"] .picker-check{opacity:1}
-.picker-actions{margin-top:1rem}
-
-/* ---- Public shared gallery ---- */
-.shared-head{margin-bottom:2.5rem;max-width:70ch}
-.shared-head h1{font-family:var(--serif);font-size:clamp(2rem,6vw,3.6rem);font-weight:300;line-height:1.02;
-  letter-spacing:-.03em;margin:.6rem 0}
-.shared-desc{font-family:var(--serif);font-style:italic;font-size:1.15rem;color:var(--ink-2);line-height:1.5;max-width:52ch}
-.shared-count{font-family:var(--mono);font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin-top:1rem}
-.shared-grid{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))}
-.shared-item{position:relative;margin:0}
-.shared-open{display:block;width:100%;aspect-ratio:4/5;border-radius:5px;overflow:hidden;cursor:pointer;background:var(--paper-2)}
-.shared-open img{width:100%;height:100%;object-fit:cover;transition:transform .8s var(--ease)}
-.shared-open:hover img{transform:scale(1.05)}
-.shared-open:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.shared-wm{position:absolute;right:.6rem;bottom:.6rem;font-family:var(--mono);font-size:.5rem;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--paper-fixed);opacity:.7;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}
-.shared-dl{display:inline-block;margin-top:.4rem;font-family:var(--mono);font-size:.54rem;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--mute);text-decoration:none;border-bottom:1px solid var(--rule)}
-.shared-dl:hover{color:var(--accent);border-color:var(--accent)}
-.shared-lock,.shared-msg{max-width:440px;margin:0 auto;text-align:center}
-.shared-lock h1,.shared-msg h1{font-family:var(--serif);font-size:clamp(1.6rem,4vw,2.4rem);font-weight:300;margin:.8rem 0 1rem}
-.shared-lock p,.shared-msg p{color:var(--mute);font-size:.92rem;margin-bottom:1.5rem}
-.shared-unlock{text-align:left;margin-top:1.5rem}
-.shared-msg a,.shared-foot a{color:var(--accent)}
-.shared-foot{margin-top:4rem;text-align:center;font-family:var(--mono);font-size:.56rem;letter-spacing:.2em;
-  text-transform:uppercase}
-.shared-foot a{text-decoration:none;color:var(--mute)}
-
 @media(max-width:640px){
   .dash-top{align-items:flex-start}
   .bar-row{grid-template-columns:minmax(60px,40%) 1fr auto}
-  .share-opts{grid-template-columns:1fr}
-  .map-controls{width:100%}
 }
 
 @media(prefers-reduced-motion:reduce){
@@ -606,13 +501,11 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
     </a>
     <nav class="nav-links" aria-label="Primary">
       <a class="nav-link active" data-page="home" href="#" onclick="go('home');return false"><span class="n">01</span>Work</a>
-      <a class="nav-link" data-page="map" href="#" onclick="go('map');return false"><span class="n">02</span>Map</a>
-      <a class="nav-link" id="nav-upload" data-page="upload" href="#" onclick="go('upload');return false"><span class="n">03</span>Upload</a>
-      <a class="nav-link" data-page="about" href="#" onclick="go('about');return false"><span class="n">04</span>About</a>
-      <a class="nav-link" data-page="contact" href="#" onclick="go('contact');return false"><span class="n">05</span>Contact</a>
+      <a class="nav-link" id="nav-upload" data-page="upload" href="#" onclick="go('upload');return false"><span class="n">02</span>Upload</a>
+      <a class="nav-link" data-page="about" href="#" onclick="go('about');return false"><span class="n">03</span>About</a>
+      <a class="nav-link" data-page="contact" href="#" onclick="go('contact');return false"><span class="n">04</span>Contact</a>
       <!-- Admin-only: shown by updateAdminNav() when signed in as owner. -->
       <a class="nav-link nav-admin" data-page="dashboard" href="#" onclick="go('dashboard');return false" hidden><span class="n">·</span>Dashboard</a>
-      <a class="nav-link nav-admin" data-page="galleries" href="#" onclick="go('galleries');return false" hidden><span class="n">·</span>Galleries</a>
     </nav>
     <div class="nav-right-group">
       <!-- Lives outside #nav-right on purpose — renderNav() replaces
@@ -752,13 +645,9 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
 
   <section id="page-photo" class="page"></section>
 
-  <!-- Populated lazily by JS on first navigation (renderMap/renderDashboard/
-       renderGalleries). Kept empty in markup so nothing loads until asked. -->
-  <section id="page-map" class="page"></section>
+  <!-- Populated lazily by JS on first navigation (renderDashboard). Kept
+       empty in markup so nothing loads until asked. -->
   <section id="page-dashboard" class="page"></section>
-  <section id="page-galleries" class="page"></section>
-  <!-- Public shared-gallery view for ?gallery=<slug> deep links. -->
-  <section id="page-shared" class="page"></section>
 
   <section id="page-contact" class="page">
     <div class="contact">
@@ -975,10 +864,10 @@ function go(page){
   // server/src/middleware/auth.ts), enforced independently of whatever
   // this tab shows. Hiding the nav item based on a live login session
   // just meant it looked "gone" whenever the backend wasn't reachable.
-  // Dashboard & Galleries are owner-only. The server enforces this on
-  // every underlying request too (requireAdmin) — this is just so the
-  // page doesn't flash before the API would reject it.
-  if((page==='dashboard'||page==='galleries')&&!isOwner()){
+  // Dashboard is owner-only. The server enforces this on every underlying
+  // request too (requireAdmin) — this is just so the page doesn't flash
+  // before the API would reject it.
+  if(page==='dashboard'&&!isOwner()){
     toast('Sign in as the archive owner');openAuth('login');return;
   }
   state.page=page;
@@ -986,13 +875,11 @@ function go(page){
   const el=$('#page-'+page); if(el) el.classList.add('active');
   $$('.nav-link').forEach(l=>l.classList.toggle('active',l.dataset.page===page));
   // Pages with their own dark surface want the solid (non-blend) header.
-  $('#header').classList.toggle('solid',page==='contact'||page==='shared');
+  $('#header').classList.toggle('solid',page==='contact');
   scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
   trackEvent('page_view',{path:'/'+page});
   // Lazy render — each screen builds on first visit and refreshes on return.
-  if(page==='map')renderMap();
-  else if(page==='dashboard')renderDashboard();
-  else if(page==='galleries')renderGalleries();
+  if(page==='dashboard')renderDashboard();
   else if(page==='home'&&state.galleryDirty){
     // A photo was uploaded/removed while you were elsewhere — bring the Work
     // gallery and homepage strip up to date now, on return, not mid-upload.
@@ -1383,10 +1270,10 @@ function updateUploadGate(){
   zone.setAttribute('aria-disabled',String(!isOwner()));
 }
 function updateAdminNav(){
-  // Reveal the owner-only Dashboard/Galleries tabs; if the owner signs
-  // out while on one, bounce them home so they're not stranded.
+  // Reveal the owner-only Dashboard tab; if the owner signs out while on
+  // it, bounce them home so they're not stranded.
   $$('.nav-admin').forEach(l=>{l.hidden=!isOwner()});
-  if(!isOwner()&&(state.page==='dashboard'||state.page==='galleries'))go('home');
+  if(!isOwner()&&state.page==='dashboard')go('home');
 }
 $('#upload-gate-in').onclick=()=>openAuth('login');
 
@@ -1660,15 +1547,6 @@ function viewPhotos(items,idx){
   }));
   if(Exhibition&&Exhibition.Lightbox)Exhibition.Lightbox.open(list,idx||0,null);
 }
-async function copyText(text,okMsg){
-  try{ await navigator.clipboard.writeText(text); toast(okMsg||'Copied'); }
-  catch(e){
-    // Clipboard API needs a secure context; fall back to a temp selection.
-    const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
-    document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast(okMsg||'Copied')}catch(_){toast('Copy failed — select manually')}
-    ta.remove();
-  }
-}
 // Horizontal magnitude bars — one series, one hue (the site accent), value
 // direct-labelled on each bar. Items: [{label,count}] (or a custom valueKey).
 function barChart(items,opts){
@@ -1693,115 +1571,6 @@ function photoLeaderboard(items,unit){
       <img src="${esc(p.lqip||'')}" data-thumb="${esc(p.thumb||'')}" alt="${esc(p.caption||'Photograph')}" loading="lazy"/>
       <span class="lead-count">${p.count} ${esc(unit)}</span>
     </button>`).join('')}</div>`;
-}
-
-/* ============================================================
-   Photography map — GPS clusters on an equirectangular plot
-   No external tiles/libraries (keeps the page self-contained);
-   markers are projected from lat/lon, sized by photo count, with
-   an optional density heatmap and a year-range timeline.
-   ============================================================ */
-const MAP_ZOOMS={country:2,region:4,city:7};
-const mapState={level:'region',from:null,to:null,heat:false,loaded:false};
-function project(lat,lon){return {x:lon+180,y:90-lat}}
-async function renderMap(){
-  const host=$('#page-map');
-  if(!mapState.loaded){
-    host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
-      <div class="section-label"><b>◵</b> Where the frames were made</div>
-      <div class="map-loading"><span class="xp-status"><span class="xp-dotpulse"></span>Plotting the archive…</span></div>
-    </div></div>`;
-  }
-  let data;
-  try{
-    const q=new URLSearchParams({zoom:MAP_ZOOMS[mapState.level]});
-    if(mapState.from)q.set('fromYear',mapState.from);
-    if(mapState.to)q.set('toYear',mapState.to);
-    data=await api('/discovery/map?'+q.toString());
-  }catch(e){
-    host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
-      <p class="xp-empty">The map needs the archive service. Start the backend to see it.</p></div></div>`;
-    return;
-  }
-  mapState.loaded=true;
-  const yr=data.yearRange;
-  if(yr&&mapState.from===null){mapState.from=yr.from;mapState.to=yr.to}
-  const clusters=data.clusters||[];
-  const maxCount=Math.max.apply(null,clusters.map(c=>c.count)) || 1;
-  const rScale=n=>2.2+Math.sqrt(n/maxCount)*7;
-
-  const yearOptions=(sel)=>{
-    if(!yr)return '';
-    let o='';for(let y=yr.from;y<=yr.to;y++)o+=`<option value="${y}"${y===sel?' selected':''}>${y}</option>`;return o;
-  };
-
-  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
-    <div class="section-label"><b>◵</b> Where the frames were made</div>
-    <div class="map-head">
-      <p class="map-lede">${data.totalGeotagged} geotagged frame${data.totalGeotagged===1?'':'s'} across the archive.
-        Larger markers hold more photographs — select one to browse it.</p>
-      <div class="map-controls">
-        <div class="seg" role="group" aria-label="Map detail">
-          ${Object.keys(MAP_ZOOMS).map(k=>`<button class="seg-btn${k===mapState.level?' on':''}" data-level="${k}">${k[0].toUpperCase()+k.slice(1)}</button>`).join('')}
-        </div>
-        <button class="map-toggle${mapState.heat?' on':''}" id="map-heat" aria-pressed="${mapState.heat}">Heatmap</button>
-        ${yr?`<label class="map-years">From <select id="map-from">${yearOptions(mapState.from)}</select>
-          to <select id="map-to">${yearOptions(mapState.to)}</select></label>`:''}
-      </div>
-    </div>
-    <div class="map-canvas${mapState.heat?' heat-on':''}">
-      <svg viewBox="0 0 360 180" preserveAspectRatio="xMidYMid meet" role="img"
-           aria-label="World map of photograph locations">
-        <defs><filter id="map-blur" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="4"/></filter></defs>
-        <g class="graticule">
-          ${[-150,-120,-90,-60,-30,0,30,60,90,120,150].map(l=>`<line x1="${l+180}" y1="0" x2="${l+180}" y2="180"/>`).join('')}
-          ${[-60,-30,0,30,60].map(l=>`<line x1="0" y1="${90-l}" x2="360" y2="${90-l}"/>`).join('')}
-          <line class="equator" x1="0" y1="90" x2="360" y2="90"/>
-        </g>
-        <g class="heat" filter="url(#map-blur)">
-          ${clusters.map(c=>{const p=project(c.lat,c.lon);return `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${(rScale(c.count)*1.8).toFixed(2)}" opacity="${(0.15+0.5*c.count/maxCount).toFixed(2)}"/>`}).join('')}
-        </g>
-        <g class="markers">
-          ${clusters.map((c,i)=>{const p=project(c.lat,c.lon);return `<circle class="marker" data-i="${i}" tabindex="0" role="button"
-            aria-label="${esc(c.place||'Unknown location')}, ${c.count} photograph${c.count===1?'':'s'}"
-            cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${rScale(c.count).toFixed(2)}"><title>${esc(c.place||'Location')} · ${c.count}</title></circle>`}).join('')}
-        </g>
-      </svg>
-    </div>
-    <div class="map-panel" id="map-panel" hidden></div>
-  </div></div>`;
-
-  $$('#page-map .seg-btn').forEach(b=>b.onclick=()=>{mapState.level=b.dataset.level;renderMap()});
-  const heatBtn=$('#map-heat');if(heatBtn)heatBtn.onclick=()=>{mapState.heat=!mapState.heat;renderMap()};
-  const fromSel=$('#map-from'),toSel=$('#map-to');
-  if(fromSel)fromSel.onchange=()=>{mapState.from=+fromSel.value;if(mapState.to<mapState.from)mapState.to=mapState.from;renderMap()};
-  if(toSel)toSel.onchange=()=>{mapState.to=+toSel.value;if(mapState.from>mapState.to)mapState.from=mapState.to;renderMap()};
-
-  $$('#page-map .marker').forEach(m=>{
-    const open=()=>openCluster(clusters[+m.dataset.i]);
-    m.onclick=open;
-    m.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}};
-  });
-}
-async function openCluster(cluster){
-  const panel=$('#map-panel');
-  panel.hidden=false;
-  panel.innerHTML=`<div class="xp-status"><span class="xp-dotpulse"></span>Loading ${cluster.count} frame${cluster.count===1?'':'s'}…</div>`;
-  panel.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'nearest'});
-  let photos=[];
-  try{ const r=await api('/discovery/map/photos',{method:'POST',body:{photoIds:cluster.photoIds}}); photos=r.photos||[]; }
-  catch(e){ panel.innerHTML='<p class="dash-empty">Could not load these frames.</p>'; return; }
-  panel.innerHTML=`<div class="map-panel-head">
-      <h3>${esc(cluster.place||'This location')}</h3>
-      <span>${cluster.count} photograph${cluster.count===1?'':'s'}</span>
-      <button class="map-panel-x" aria-label="Close">&times;</button>
-    </div>
-    <div class="map-thumbs">${photos.map((p,i)=>`
-      <button class="map-thumb" data-i="${i}" aria-label="Open ${esc((p.ai&&p.ai.title)||(p.ai&&p.ai.caption)||'photograph')}">
-        <img src="${esc(p.lqip||p.thumb)}" alt=""/></button>`).join('')}</div>`;
-  $('.map-panel-x',panel).onclick=()=>{panel.hidden=true};
-  $$('.map-thumb',panel).forEach(t=>t.onclick=()=>viewPhotos(photos,+t.dataset.i));
 }
 
 /* ============================================================
@@ -1878,246 +1647,6 @@ async function renderDashboard(force){
   });
 }
 
-/* ============================================================
-   Client gallery management (owner only)
-   ============================================================ */
-let galleriesCache=[];
-async function renderGalleries(){
-  const host=$('#page-galleries');
-  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
-    <div class="section-label"><b>◈</b> Client galleries</div>
-    <div class="gal-loading"><span class="xp-status"><span class="xp-dotpulse"></span>Loading collections…</span></div>
-  </div></div>`;
-  try{ const r=await api('/collections'); galleriesCache=r.collections||[]; }
-  catch(e){
-    host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
-      <p class="xp-empty">Galleries need the archive service and an owner session.</p></div></div>`;
-    return;
-  }
-  const kinds=['COLLECTION','ALBUM','PROJECT','STORY','JOURNAL','SEASONAL'];
-  const kindLabel=k=>k.charAt(0)+k.slice(1).toLowerCase();
-  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap gal">
-    <div class="dash-top">
-      <div class="section-label" style="margin:0"><b>◈</b> Client galleries</div>
-      <button class="btn-solid gal-new-btn" id="gal-new">New collection</button>
-    </div>
-    <form class="gal-create" id="gal-create" hidden>
-      <div class="fld"><input id="gal-name" placeholder="Collection name" maxlength="80"/></div>
-      <div class="fld"><input id="gal-desc" placeholder="Description (optional)" maxlength="500"/></div>
-      <div class="gal-create-row">
-        <select id="gal-kind">${kinds.map(k=>`<option value="${k}">${kindLabel(k)}</option>`).join('')}</select>
-        <label class="gal-check"><input type="checkbox" id="gal-public"/> Public</label>
-        <button type="submit" class="btn-solid">Create</button>
-      </div>
-    </form>
-    ${galleriesCache.length?`<div class="gal-list">${galleriesCache.map(renderGalleryCard).join('')}</div>`
-      :'<p class="dash-empty" style="margin-top:2rem">No collections yet. Create one to start building a client gallery.</p>'}
-  </div></div>`;
-
-  const newBtn=$('#gal-new'),form=$('#gal-create');
-  newBtn.onclick=()=>{form.hidden=!form.hidden;if(!form.hidden)$('#gal-name').focus()};
-  form.onsubmit=async e=>{
-    e.preventDefault();
-    const name=$('#gal-name').value.trim();
-    if(!name){toast('Name the collection');return}
-    try{
-      await api('/collections',{method:'POST',body:{name,description:$('#gal-desc').value.trim()||undefined,
-        kind:$('#gal-kind').value,isPublic:$('#gal-public').checked}});
-      toast('Collection created');renderGalleries();
-    }catch(err){toast(err.message||'Could not create')}
-  };
-  wireGalleryCards();
-}
-function renderGalleryCard(c){
-  const shared=!!c.shareSlug;
-  const expired=c.expiresAt&&new Date(c.expiresAt)<new Date();
-  const kindLabel=c.kind?c.kind.charAt(0)+c.kind.slice(1).toLowerCase():'Collection';
-  return `<article class="gal-card" data-id="${esc(c.id)}">
-    <div class="gal-card-head">
-      <div>
-        <h3>${esc(c.name)}</h3>
-        <div class="gal-meta">
-          <span class="gal-badge">${esc(kindLabel)}</span>
-          <span>${c.photoCount||0} photo${(c.photoCount||0)===1?'':'s'}</span>
-          ${shared?`<span class="gal-badge ${expired?'warn':'live'}">${expired?'Link expired':'Shared'}</span>`:''}
-          ${c.hasPassword?'<span class="gal-badge">🔒 Password</span>':''}
-        </div>
-      </div>
-      <div class="gal-actions">
-        <button class="rm gal-add" data-id="${esc(c.id)}">Add photos</button>
-        <button class="rm gal-share-btn" data-id="${esc(c.id)}">${shared?'Sharing':'Share'}</button>
-        <button class="rm gal-del" data-id="${esc(c.id)}">Delete</button>
-      </div>
-    </div>
-    ${c.description?`<p class="gal-desc">${esc(c.description)}</p>`:''}
-    <div class="gal-share" data-share="${esc(c.id)}" hidden></div>
-    <div class="gal-picker" data-picker="${esc(c.id)}" hidden></div>
-  </article>`;
-}
-function wireGalleryCards(){
-  $$('#page-galleries .gal-del').forEach(b=>b.onclick=()=>{
-    $('#cf-h').textContent='Delete collection?';
-    $('#cf-p').textContent='The photographs stay in the archive — only this grouping is removed.';
-    $('#cf-yes').textContent='Delete';$('#confirm').classList.add('open');
-    $('#cf-yes').onclick=async()=>{
-      $('#confirm').classList.remove('open');
-      try{await api('/collections/'+b.dataset.id,{method:'DELETE'});toast('Collection deleted');renderGalleries()}
-      catch(e){toast(e.message||'Could not delete')}
-      $('#cf-h').textContent='Remove this frame?';$('#cf-p').textContent='It will leave the archive. This cannot be undone.';
-      $('#cf-yes').textContent='Yes, remove';$('#cf-yes').onclick=null;
-    };
-  });
-  $$('#page-galleries .gal-share-btn').forEach(b=>b.onclick=()=>toggleShareForm(b.dataset.id));
-  $$('#page-galleries .gal-add').forEach(b=>b.onclick=()=>togglePhotoPicker(b.dataset.id));
-}
-function toggleShareForm(id){
-  const box=$('[data-share="'+id+'"]');
-  if(!box.hidden){box.hidden=true;return}
-  $$('#page-galleries [data-share]').forEach(b=>b.hidden=true);
-  $$('#page-galleries [data-picker]').forEach(b=>b.hidden=true);
-  const c=galleriesCache.find(x=>x.id===id)||{};
-  const shared=!!c.shareSlug;
-  const shareUrl=shared?(location.origin+location.pathname+'?gallery='+c.shareSlug):'';
-  box.innerHTML=`
-    ${shared?`<div class="share-url"><input readonly value="${esc(shareUrl)}" aria-label="Share link"/>
-      <button class="rm" data-copy>Copy</button></div>`:''}
-    <div class="share-opts">
-      <label class="fld share-pw"><span>Password (optional)</span>
-        <input type="text" data-pw placeholder="${c.hasPassword?'••••• set — type to change':'No password'}"/></label>
-      <label class="fld"><span>Expires (optional)</span>
-        <input type="date" data-exp${c.expiresAt?` value="${new Date(c.expiresAt).toISOString().slice(0,10)}"`:''}/></label>
-    </div>
-    <div class="share-toggles">
-      <label class="gal-check"><input type="checkbox" data-dl ${c.allowDownload!==false?'checked':''}/> Allow downloads</label>
-      <label class="gal-check"><input type="checkbox" data-wm ${c.watermark?'checked':''}/> Watermark</label>
-    </div>
-    <div class="share-actions">
-      <button class="btn-solid" data-savelink>${shared?'Update link':'Create link'}</button>
-      ${shared?'<button class="rm" data-revoke>Revoke</button>':''}
-    </div>`;
-  box.hidden=false;
-  const copyBtn=$('[data-copy]',box);if(copyBtn)copyBtn.onclick=()=>copyText(shareUrl,'Share link copied');
-  $('[data-savelink]',box).onclick=async()=>{
-    const pw=$('[data-pw]',box).value.trim();
-    const exp=$('[data-exp]',box).value;
-    const body={allowDownload:$('[data-dl]',box).checked,watermark:$('[data-wm]',box).checked};
-    if(pw)body.password=pw;
-    if(exp)body.expiresAt=new Date(exp+'T23:59:59').toISOString();
-    try{
-      const r=await api('/collections/'+id+'/share',{method:'POST',body});
-      toast('Share link ready');
-      const idx=galleriesCache.findIndex(x=>x.id===id);
-      if(idx>-1)galleriesCache[idx]=Object.assign({},galleriesCache[idx],{shareSlug:r.shareSlug,hasPassword:r.hasPassword,expiresAt:r.expiresAt,allowDownload:r.allowDownload,watermark:r.watermark});
-      // Re-render just this card's chrome so badges/URL reflect the change.
-      const card=$('.gal-card[data-id="'+id+'"]');if(card)card.outerHTML=renderGalleryCard(galleriesCache[idx]);
-      wireGalleryCards();toggleShareForm(id);
-    }catch(e){toast(e.message||'Could not save link')}
-  };
-  const rev=$('[data-revoke]',box);
-  if(rev)rev.onclick=async()=>{
-    try{await api('/collections/'+id+'/share',{method:'DELETE'});toast('Link revoked');
-      const idx=galleriesCache.findIndex(x=>x.id===id);
-      if(idx>-1)galleriesCache[idx]=Object.assign({},galleriesCache[idx],{shareSlug:null,hasPassword:false,expiresAt:null});
-      renderGalleries();
-    }catch(e){toast(e.message||'Could not revoke')}
-  };
-}
-async function togglePhotoPicker(id){
-  const box=$('[data-picker="'+id+'"]');
-  if(!box.hidden){box.hidden=true;return}
-  $$('#page-galleries [data-picker]').forEach(b=>b.hidden=true);
-  $$('#page-galleries [data-share]').forEach(b=>b.hidden=true);
-  const pool=state.photos.slice(0,60);
-  if(!pool.length){box.innerHTML='<p class="dash-empty">Upload photographs first.</p>';box.hidden=false;return}
-  box.innerHTML=`<p class="picker-hint">Select frames to add to this collection.</p>
-    <div class="picker-grid">${pool.map(p=>`
-      <button class="picker-item" data-pid="${esc(p.id)}" aria-pressed="false"
-        aria-label="Toggle ${esc((p.ai&&p.ai.caption)||'photograph')}">
-        <img src="${esc(p.lqip||p.url)}" alt=""/><span class="picker-check">✓</span></button>`).join('')}</div>
-    <div class="picker-actions"><button class="btn-solid" data-addsel>Add selected</button></div>`;
-  box.hidden=false;
-  const chosen=new Set();
-  $$('.picker-item',box).forEach(it=>it.onclick=()=>{
-    const pid=it.dataset.pid;
-    if(chosen.has(pid)){chosen.delete(pid);it.setAttribute('aria-pressed','false')}
-    else{chosen.add(pid);it.setAttribute('aria-pressed','true')}
-  });
-  $('[data-addsel]',box).onclick=async()=>{
-    if(!chosen.size){toast('Select at least one');return}
-    try{
-      for(const pid of chosen)await api('/collections/'+id+'/photos',{method:'POST',body:{photoId:pid}});
-      toast(chosen.size+' added');renderGalleries();
-    }catch(e){toast(e.message||'Could not add')}
-  };
-}
-
-/* ============================================================
-   Public shared gallery — what a client sees at ?gallery=<slug>
-   ============================================================ */
-async function renderSharedGallery(slug){
-  const host=$('#page-shared');
-  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap">
-    <div class="shared-loading"><span class="xp-status"><span class="xp-dotpulse"></span>Opening gallery…</span></div></div></div>`;
-  let g;
-  try{ g=await api('/collections/shared/'+encodeURIComponent(slug)); }
-  catch(e){
-    const msg=e.status===410?'This gallery link has expired.':e.status===404?'This gallery could not be found.':'This gallery is unavailable right now.';
-    host.innerHTML=`<div class="section" style="padding-top:8rem"><div class="wrap"><div class="shared-msg">
-      <h1>${esc(msg)}</h1><p><a href="${location.pathname}">Back to the portfolio</a></p></div></div></div>`;
-    return;
-  }
-  if(g.locked){
-    host.innerHTML=`<div class="section" style="padding-top:8rem"><div class="wrap"><div class="shared-lock">
-      <div class="section-label"><b>🔒</b> Private gallery</div>
-      <h1>${esc(g.name)}</h1>
-      <p>${g.photoCount} photograph${g.photoCount===1?'':'s'} · enter the password to view.</p>
-      <form id="shared-unlock" class="shared-unlock">
-        <div class="err" id="shared-err"></div>
-        <div class="fld"><input type="password" id="shared-pw" placeholder="Gallery password" autocomplete="off"/></div>
-        <button class="submit" type="submit">Unlock gallery</button>
-      </form></div></div></div>`;
-    $('#shared-unlock').onsubmit=async e=>{
-      e.preventDefault();
-      const err=$('#shared-err');err.classList.remove('show');
-      try{
-        await api('/collections/shared/'+encodeURIComponent(slug)+'/unlock',{method:'POST',body:{password:$('#shared-pw').value}});
-        renderSharedGallery(slug);
-      }catch(er){err.textContent=er.message||'Incorrect password.';err.classList.add('show')}
-    };
-    return;
-  }
-  const photos=g.photos||[];
-  const wm=g.watermark?' watermarked':'';
-  host.innerHTML=`<div class="section" style="padding-top:7rem"><div class="wrap shared">
-    <div class="shared-head">
-      <div class="section-label"><b>◈</b> ${esc((g.kind||'gallery').toLowerCase())}</div>
-      <h1>${esc(g.name)}</h1>
-      ${g.description?`<p class="shared-desc">${esc(g.description)}</p>`:''}
-      <p class="shared-count">${photos.length} photograph${photos.length===1?'':'s'}${g.expiresAt?` · available until ${new Date(g.expiresAt).toLocaleDateString()}`:''}</p>
-    </div>
-    ${photos.length?`<div class="shared-grid${wm}">${photos.map((p,i)=>{
-      const set=(p.urls&&p.urls.jpeg)||'';
-      const thumb=set.split(',')[0]?set.split(',')[0].trim().split(' ')[0]:(p.urls&&p.urls.original)||'';
-      return `<figure class="shared-item">
-        <button class="shared-open" data-i="${i}" aria-label="Open ${esc((p.ai&&p.ai.title)||(p.ai&&p.ai.caption)||'photograph')}">
-          <img src="${esc(p.lqip||'')}" data-full="${esc(thumb)}" alt="${esc((p.ai&&p.ai.altText)||'Photograph')}" loading="lazy"/>
-          ${g.watermark?'<span class="shared-wm">© Katnam Sathvik</span>':''}
-        </button>
-        ${g.allowDownload?`<a class="shared-dl" href="${esc((p.urls&&p.urls.original)||thumb)}" download aria-label="Download">Download</a>`:''}
-      </figure>`;
-    }).join('')}</div>`:'<p class="xp-empty">This gallery has no photographs yet.</p>'}
-    <p class="shared-foot"><a href="${location.pathname}">Katnam Sathvik — Photography</a></p>
-  </div></div>`;
-  $$('#page-shared img[data-full]').forEach(im=>{im.src=im.dataset.full});
-  const openList=photos.map(p=>{
-    const set=(p.urls&&p.urls.jpeg)||'';const entries=set.split(',').map(s=>s.trim()).filter(Boolean);
-    const big=entries.length?entries[entries.length-1].split(' ')[0]:(p.urls&&p.urls.original)||'';
-    return {id:p.id,url:big,lqip:p.lqip,ai:p.ai,exif:{}};
-  });
-  $$('#page-shared .shared-open').forEach(b=>b.onclick=()=>viewPhotos(openList,+b.dataset.i));
-  go('shared');
-}
-
 /* ---------- boot ---------- */
 (async function boot(){
   try{ const {user}=await api('/auth/me'); state.user=user }catch(e){ /* not signed in */ }
@@ -2136,11 +1665,7 @@ async function renderSharedGallery(slug){
   trackEvent('page_view');
   // Non-blocking: the gallery is already interactive by this point.
   initHomepageSections();
-  // Deep link: a client arriving at ?gallery=<slug> lands straight on
-  // their shared gallery rather than the portfolio home.
   const params=new URLSearchParams(location.search);
-  const sharedSlug=params.get('gallery');
-  if(sharedSlug)renderSharedGallery(sharedSlug);
   // Deep link: an emailed password-reset link (?reset=<token>) opens the auth
   // card straight into "set a new password" mode.
   const resetToken=params.get('reset');

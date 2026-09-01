@@ -1,89 +1,115 @@
 # Katnam Sathvik — Photography Portfolio
 
-A full-stack photography portfolio: a static, animation-heavy single-page
-frontend backed by a production Node.js/Express API with real auth, an
-AI-powered upload pipeline, semantic search, and a RAG chat assistant scoped
-to the photographer's own work.
+**Live:** https://sathvik-photography.vercel.app · https://sathviksatya758-prog.github.io/sathvik-photography/
 
-```
-index.html, exhibition.js, exhibition.css   Frontend — SPA, no build step
-server/                                     Backend — Express + TypeScript + Prisma
-docs/API.md                                 Full endpoint reference
-docs/DEPLOYMENT.md                          How the two are wired together + hosting notes
-.github/workflows/ci.yml                    Lint/typecheck/test/build/docker-build on every push
-```
+A full-stack photography portfolio built for a working photographer based in
+Visakhapatnam, India. It pairs a hand-built, animation-driven single-page
+frontend with a production-grade Node.js API — real authentication, an
+AI-assisted upload pipeline, hybrid semantic search, and a retrieval-augmented
+chat assistant that only answers questions about the photographer's own work.
 
-## Quickstart
+The project treats the archive as structured data rather than a folder of
+JPEGs: every photograph carries EXIF, a computed colour palette, AI-generated
+captions and composition analysis, and a vector embedding, so the site can
+browse, search, and talk about the work the way a human curator would —
+without depending on a page-builder template or a third-party gallery plugin.
 
-The only hard dependency is a Postgres database with `pgvector`. Redis, S3, the
-AI keys and SMTP are all optional — without them the app falls back to local
-disk storage, an in-memory cache with inline image processing, non-AI metadata,
-and console-logged email, so you can run the whole stack against nothing but a
-connection string. A free cloud Postgres (Neon/Supabase) has pgvector built in.
+## What it does
+
+- **Discovery browsing.** The homepage organises photographs into
+  AI-categorised horizontal rows (mood, subject, palette, season) rather than
+  a single flat grid, with a masonry and a uniform-grid view available as
+  alternatives, remembered per visitor.
+- **Real authentication.** Argon2id password hashing, rotating JWT refresh
+  tokens with theft/reuse detection, double-submit CSRF protection, and a
+  server-verified admin role — the upload/delete/dashboard surface is gated
+  by a signed token, not a client-side flag that could be spoofed.
+- **AI-assisted uploads.** Every photograph is read for EXIF, quantised into
+  a dominant colour palette, and — when an Anthropic key is configured —
+  captioned, storied, and tagged by Claude, then embedded for search.
+  AVIF/WebP/JPEG renditions are generated at five responsive breakpoints.
+- **Hybrid search.** pgvector semantic similarity combined with lexical term
+  matching, cached and reranked, surfaced through an "Ask AI" search box.
+- **Studio assistant.** A streaming chat widget backed by retrieval over the
+  photographer's own archive and biography, with inline citations — scoped
+  so it can't be steered into general-purpose use or discussing pricing.
+- **Owner dashboard.** Portfolio KPIs, camera/lens/genre breakdowns, an
+  AI-written narrative summary, and AI-proposed auto-organization
+  suggestions that require explicit admin approval before anything changes.
+- **Accessibility and SEO.** Dynamic JSON-LD structured data, descriptive
+  alt text generated per photograph, a keyboard-navigable lightbox with a
+  focus trap, and reduced-motion support throughout.
+
+## Architecture
+
+The frontend is a single `index.html` with no build step and no framework —
+plain JavaScript, animated with CSS transforms and the FLIP technique for
+the masonry layout. The backend is Express and TypeScript on Node, with
+Prisma over PostgreSQL (pgvector for embeddings), Redis-backed caching and
+job queues when available, and a graceful in-process fallback when they're
+not — the whole stack runs end to end on nothing but a Postgres connection
+string, with every optional integration (Redis, object storage, Claude,
+OpenAI, SMTP) switching on automatically the moment its credentials are set.
+
+In production, the static frontend and the API run as one Vercel project —
+the API as a serverless function on the same domain, which keeps
+authentication cookies same-site without any special-casing. Photo storage
+uses Vercel Blob rather than local disk, since a serverless function has no
+persistent filesystem between invocations. The same backend also serves a
+second, public mirror of the frontend on GitHub Pages, wired through CORS
+and cross-site cookies so the two stay functionally identical.
+
+## Stack
+
+**Frontend** — vanilla JavaScript, no framework, no bundler.
+**Backend** — Node.js, Express, TypeScript, Prisma, PostgreSQL + pgvector,
+Redis and BullMQ (optional), Argon2, JWT, Zod, Helmet.
+**AI** — Anthropic Claude for captions/chat/critique, OpenAI for embeddings —
+both optional, with deterministic non-AI fallbacks when unset.
+**Infrastructure** — Vercel (frontend + serverless API), Vercel Blob (object
+storage), Neon (managed Postgres), GitHub Actions (lint, typecheck, test and
+build on every push), GitHub Pages (public mirror).
+
+## Security
+
+Helmet with a strict content-security policy, rate limiting tuned per route
+class (tighter on auth and AI endpoints), account lockout after repeated
+failed logins, hashed and rotated refresh tokens with family-wide revocation
+on reuse detection, consistent HTML-escaping of user-supplied input, and no
+client-controllable authorization anywhere — every privileged action is
+re-checked server-side against a signed token, independent of what the UI
+shows.
+
+## Running it locally
 
 ```bash
 cd server
 npm install
-cp .env.example .env            # then set DATABASE_URL (everything else optional)
+cp .env.example .env       # set DATABASE_URL — everything else is optional
 npx prisma generate
-npx prisma migrate deploy       # schema + pgvector functions/indexes
-npm run dev                     # API on :4000
+npx prisma migrate deploy
+npm run dev                # API on :4000
 ```
 
-Then serve the repo root over http (cookies don't work from `file://`):
+Serve the repo root over HTTP in a second terminal — cookies don't work from
+a `file://` path:
 
 ```bash
-npx serve -l 8080 .             # open http://localhost:8080
+npx serve -l 8080 .
 ```
 
-Sign up with the owner email to get the admin account. Step-by-step Windows
-setup (including free cloud Postgres and turning AI/Redis/S3 on later):
-[`docs/RUN_ON_WINDOWS.md`](docs/RUN_ON_WINDOWS.md). With Redis configured, also
-run `npm run worker` for out-of-process image processing. Full backend details:
-[`server/README.md`](server/README.md).
+Sign up with the address configured as `OWNER_EMAIL` to receive the admin
+role. Full local setup, including a free cloud Postgres option, is in
+[`docs/RUN_ON_WINDOWS.md`](docs/RUN_ON_WINDOWS.md); the complete API
+reference is in [`docs/API.md`](docs/API.md).
 
-## Frontend
+## Project layout
 
-Single page, four sections (Work / Upload / About / Contact), no framework,
-no build step — just `index.html` plus the `exhibition.js`/`.css` upgrade
-layer.
-
-| Feature | Notes |
-|---|---|
-| Discovery view | Default browsing experience — horizontal AI-categorised rails (Wildlife, Golden Hour, Ocean Blues…) that scroll sideways while the page scrolls down |
-| View switcher | Discovery / Masonry / Grid, remembered per visitor. The original masonry layout is untouched and still one click away |
-| Masonry gallery | FLIP-animated layout, lazy loading, auto-generated category filters, offline lexical search |
-| Recommendation rails | Opening a photo reveals AI Recommended, Related, More Like This, Shares Subjects, Same Palette/Mood/Camera/Lens, Nearby and Recently Captured |
-| Photography map | GPS-plotted world map (self-contained SVG, no external tiles) with count-scaled markers, density heatmap, and a year-range timeline |
-| Analytics dashboard | Owner-only: KPI tiles, camera/lens/focal/ISO/genre/subject/seasonal bars, colour-trend strip, most-viewed/downloaded leaderboards, AI narrative |
-| Client galleries | Owner-only management (create collections, add photos, mint password/expiry share links) plus the public shared-gallery view clients see at `/?gallery=<slug>` |
-| Lightbox | Keyboard nav, zoom/pan, filmstrip, EXIF viewer, focus trap |
-| Upload | Drag-and-drop, real EXIF extraction, colour palette, blur placeholder — owner-only, now server-verified |
-| Auth | Sign in/up UI; passwords hashed server-side with Argon2, sessions in httpOnly JWT cookies |
-| Studio assistant | Chat widget with streaming replies, clickable citations, backed by pgvector retrieval + Claude, scoped to photography-only questions |
-| Contact | Real form (name/email/subject/message) alongside the mailto fallback |
-| SEO | Dynamic JSON-LD + meta tags |
-
-The Upload nav link is visible only to the signed-in owner account — enforced
-by the server (`role: ADMIN`, checked from a signed JWT), not just hidden in
-the UI.
-
-## Backend
-
-Node.js + Express + TypeScript, PostgreSQL + Prisma + pgvector, Redis, an
-S3-compatible object store, Claude for captioning/chat/critique, OpenAI for
-embeddings. Covers auth (JWT + refresh rotation, email verification,
-password reset), a background-queued image pipeline (EXIF → palette → LQIP →
-AVIF/WebP/JPEG renditions → AI caption/story/tags/mood/genre/multi-platform
-captions/composition analysis → embeddings), hybrid semantic+lexical search
-(cached), a streaming RAG chat endpoint, on-demand AI photo critique,
-AI-generated auto-organization suggestions (featured picks, duplicate
-detection — admin-approved before anything applies), portfolio insights
-with an AI narrative summary, favorites/collections, a real contact form,
-analytics, and admin endpoints — plus Helmet, CORS, CSRF, rate limiting,
-structured logging, and Docker/CI. See [`server/README.md`](server/README.md)
-for the full breakdown and [`docs/API.md`](docs/API.md) for every endpoint.
-
-`server/legacy/` holds the original `lib.ts`/`routes.ts`/`schema.sql`
-blueprint (Next.js route-handler style) this backend was built from — kept
-for reference, not imported by anything.
+```
+index.html, exhibition.js, exhibition.css   Frontend — single page, no build step
+api/index.ts                                Vercel serverless entrypoint (wraps the Express app)
+server/                                      Backend — Express + TypeScript + Prisma
+docs/API.md                                  Full endpoint reference
+docs/DEPLOYMENT.md                           How the two are wired together + hosting notes
+.github/workflows/ci.yml                     Lint/typecheck/test/build on every push
+```

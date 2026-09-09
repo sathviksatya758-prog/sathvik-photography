@@ -126,10 +126,20 @@ h1,h2,h3{font-weight:400}
    past the hero, or on the dark .contact page) drops the blend mode but
    still sits on fixed-dark chrome, so the same fixed colours still apply. */
 header{position:fixed;top:0;left:0;right:0;z-index:50;padding:1.4rem 0;mix-blend-mode:difference;
-  transition:background-color .4s var(--ease),backdrop-filter .4s var(--ease),box-shadow .4s var(--ease)}
+  --page-fade-blur:0px;--page-fade-opacity:1;filter:blur(var(--page-fade-blur));opacity:var(--page-fade-opacity);
+  transition:background-color .4s var(--ease),backdrop-filter .4s var(--ease),box-shadow .4s var(--ease),
+    filter .15s linear,opacity .15s linear}
 header.solid{mix-blend-mode:normal;background:rgba(22,21,19,.55);
   backdrop-filter:blur(16px) saturate(1.5);-webkit-backdrop-filter:blur(16px) saturate(1.5);
   box-shadow:0 1px 0 rgba(245,241,234,.08)}
+/* On the About page specifically, the brand logo/nav (header) and the
+   "03 · About" label were fighting the portrait + bio text for attention
+   right where they overlap on scroll. Both recede into soft focus as the
+   visitor scrolls — same --page-fade-* mechanism as the homepage hero
+   (see updateAboutFade() below) — while .about-photo/.about-text are
+   never touched, so the actual content stays fully sharp throughout. */
+#about-label{--page-fade-blur:0px;--page-fade-opacity:1;filter:blur(var(--page-fade-blur));
+  opacity:var(--page-fade-opacity);transition:filter .15s linear,opacity .15s linear}
 .nav-inner{max-width:1440px;margin:0 auto;padding:0 clamp(1.25rem,3vw,2.5rem);
   display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
 .brand{display:flex;flex-direction:column;line-height:1.1}
@@ -633,7 +643,7 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
   <section id="page-about" class="page">
     <div class="section" style="padding-top:8rem">
       <div class="wrap">
-        <div class="section-label"><b>03 ·</b> About</div>
+        <div class="section-label" id="about-label"><b>03 ·</b> About</div>
         <div class="about-grid">
           <div class="about-photo">
             <img src="assets/about-portrait.jpg" alt="Portrait of Katnam Sathvik"/>
@@ -904,6 +914,8 @@ function go(page){
   $$('.nav-link').forEach(l=>l.classList.toggle('active',l.dataset.page===page));
   // Pages with their own dark surface want the solid (non-blend) header.
   $('#header').classList.toggle('solid',page==='contact');
+  updateAboutFade(); // reset instantly when leaving About; scrollTo(0) below fires
+                      // no 'scroll' event if already at the top, so this can't wait for it
   scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
   trackEvent('page_view',{path:'/'+page});
   // Lazy render — each screen builds on first visit and refreshes on return.
@@ -1499,6 +1511,35 @@ addEventListener('scroll',()=>{
   addEventListener('resize',onScroll,{passive:true});
   apply();
 })();
+
+/* ---------- About page: fade the chrome, not the content ----------
+   Same --page-fade-blur/--page-fade-opacity mechanism as the hero, but
+   aimed at the opposite elements: on the About page the brand logo/nav
+   (header) and the "03 · About" label sit close enough to the portrait
+   and bio that they were competing with it on scroll. Those two recede
+   into soft focus as the visitor scrolls the About page; .about-photo
+   and .about-text are never referenced here, so they stay fully sharp.
+   Resets both back to normal the instant you're not on the About page —
+   called directly from go() (scrolling to an already-0 scrollY fires no
+   'scroll' event, so the reset can't rely on the listener alone) and
+   kept in sync via the same rAF-throttled scroll listener while you are. */
+const ABOUT_FADE_DISTANCE=220; // px of scroll for the fade to fully complete
+let aboutFadeQueued=false;
+function updateAboutFade(){
+  aboutFadeQueued=false;
+  const header=$('#header'),label=$('#about-label');
+  if(!header)return;
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const progress=(state.page!=='about'||reduce)?0:Math.min(Math.max(scrollY,0),ABOUT_FADE_DISTANCE)/ABOUT_FADE_DISTANCE;
+  const blur=(progress*8).toFixed(2)+'px', op=(1-progress*0.6).toFixed(3);
+  header.style.setProperty('--page-fade-blur',blur);
+  header.style.setProperty('--page-fade-opacity',op);
+  if(label){label.style.setProperty('--page-fade-blur',blur);label.style.setProperty('--page-fade-opacity',op);}
+}
+addEventListener('scroll',()=>{
+  if(!aboutFadeQueued){aboutFadeQueued=true;requestAnimationFrame(updateAboutFade);}
+},{passive:true});
+
 addEventListener('keydown',e=>{if(e.key==='Escape'){closeAuth();
   $('#confirm').classList.remove('open');$('#chat').classList.remove('open')}});
 

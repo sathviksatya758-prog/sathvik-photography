@@ -4,8 +4,8 @@ import * as chatService from './chat.service';
 import { logger } from '../../lib/logger';
 
 export const askHandler = asyncHandler(async (req, res) => {
-  const { message, sessionId } = req.body as { message: string; sessionId?: string };
-  const result = await chatService.ask(message, sessionId, req.user?.sub);
+  const { message, sessionId } = req.body as { message: string; sessionId?: string | null };
+  const result = await chatService.ask(message, sessionId ?? undefined, req.user?.sub);
   res.json(result);
 });
 
@@ -13,7 +13,8 @@ export const askHandler = asyncHandler(async (req, res) => {
 // as text deltas so the widget can render progressively instead of
 // waiting for the full reply. Event frames: sessionId, delta*, sources, done.
 export const askStreamHandler = asyncHandler(async (req, res) => {
-  const { message, sessionId } = req.body as { message: string; sessionId?: string };
+  const { message, sessionId: rawSessionId } = req.body as { message: string; sessionId?: string | null };
+  const sessionId = rawSessionId ?? undefined;
 
   res.set({
     'Content-Type': 'text/event-stream',

@@ -124,8 +124,11 @@ h1,h2,h3{font-weight:400}
    rather than the theme-swapped --paper/--ink. header.solid (scrolled
    past the hero, or on the dark .contact page) drops the blend mode but
    still sits on fixed-dark chrome, so the same fixed colours still apply. */
-header{position:fixed;top:0;left:0;right:0;z-index:50;padding:1.4rem 0;mix-blend-mode:difference}
-header.solid{mix-blend-mode:normal}
+header{position:fixed;top:0;left:0;right:0;z-index:50;padding:1.4rem 0;mix-blend-mode:difference;
+  transition:background-color .4s var(--ease),backdrop-filter .4s var(--ease),box-shadow .4s var(--ease)}
+header.solid{mix-blend-mode:normal;background:rgba(22,21,19,.55);
+  backdrop-filter:blur(16px) saturate(1.5);-webkit-backdrop-filter:blur(16px) saturate(1.5);
+  box-shadow:0 1px 0 rgba(245,241,234,.08)}
 .nav-inner{max-width:1440px;margin:0 auto;padding:0 clamp(1.25rem,3vw,2.5rem);
   display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
 .brand{display:flex;flex-direction:column;line-height:1.1}

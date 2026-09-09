@@ -208,6 +208,16 @@ header.solid{mix-blend-mode:normal;background:rgba(22,21,19,.55);
   text-transform:uppercase;color:var(--mute)}
 .hero-stat strong{display:block;font-family:var(--serif);font-style:italic;font-size:1.35rem;
   color:var(--ink);text-transform:none;letter-spacing:-.01em;margin-top:4px;font-weight:400}
+/* Racks focus off the giant hero heading as it scrolls up and out — without
+   this it scrolls at full clarity right up until it's clipped by the
+   viewport edge, which read as the type "bleeding" under the fixed header.
+   Driven by --hero-blur/--hero-opacity (see the scroll listener below);
+   the short transition just smooths the per-frame steps, it isn't the
+   thing animating the value. Never touches .feature-wrap (the photo) or
+   any nav/section content — only this text block. */
+.hero-copy{--hero-blur:0px;--hero-opacity:1;filter:blur(var(--hero-blur));
+  opacity:var(--hero-opacity);transition:filter .15s linear,opacity .15s linear;
+  will-change:filter,opacity}
 .feature-wrap{margin-top:4rem;height:clamp(55vh,75vh,760px);overflow:hidden;position:relative;
   border-radius:4px;background:var(--paper-2);clip-path:inset(0 100% 0 0);
   animation:wipe 1.3s cubic-bezier(.76,0,.24,1) .5s forwards}
@@ -534,17 +544,19 @@ footer{padding:2.2rem 0;background:var(--ink-fixed);color:var(--paper-fixed);
   <section id="page-home" class="page active">
     <div class="hero">
       <div class="wrap">
-        <div class="hero-meta">
-          <span><span class="dot"></span>Available for commissions · 2026</span>
-          <span>Edition N°01</span>
-        </div>
-        <h1><span class="w d1"><span>Light,</span></span> <span class="w d2"><span>held</span></span><br/>
-          <span class="w d3"><span>in</span></span> <span class="w d4"><span><em>quiet</em></span></span>
-          <span class="w d4"><span><em>frames.</em></span></span></h1>
-        <div class="hero-bottom">
-          <p class="hero-lede">An archive of nature, monuments, wildlife and people — made slowly, on film, since 2023.</p>
-          <div class="hero-div"></div>
-          <div class="hero-stat">Photographs in archive<strong id="count">00</strong></div>
+        <div class="hero-copy" id="hero-copy">
+          <div class="hero-meta">
+            <span><span class="dot"></span>Available for commissions · 2026</span>
+            <span>Edition N°01</span>
+          </div>
+          <h1><span class="w d1"><span>Light,</span></span> <span class="w d2"><span>held</span></span><br/>
+            <span class="w d3"><span>in</span></span> <span class="w d4"><span><em>quiet</em></span></span>
+            <span class="w d4"><span><em>frames.</em></span></span></h1>
+          <div class="hero-bottom">
+            <p class="hero-lede">An archive of nature, monuments, wildlife and people — made slowly, on film, since 2023.</p>
+            <div class="hero-div"></div>
+            <div class="hero-stat">Photographs in archive<strong id="count">00</strong></div>
+          </div>
         </div>
         <div class="feature-wrap" data-cursor data-image id="feature">
           <img id="feature-img" src="" alt="Featured photograph" aria-describedby="feature-desc"/>
@@ -1457,6 +1469,36 @@ $('#contact-form').addEventListener('submit',async e=>{
 addEventListener('scroll',()=>{
   $('#header').classList.toggle('solid',state.page==='contact'||scrollY>window.innerHeight*0.9);
 },{passive:true});
+
+/* ---------- hero focus-rack on scroll ----------
+   The hero heading scrolls up under the fixed header like any other
+   in-flow content — nothing pins it in place — but at full clarity that
+   read as the giant type "bleeding" through the header/nav as it passed
+   underneath. This racks it softly out of focus over its own height as it
+   scrolls by, so it visibly recedes before it ever reaches the header
+   instead of sliding under at full strength. One passive scroll listener,
+   the actual style write batched through requestAnimationFrame so it can
+   never run more than once per frame no matter how fast scroll events fire. */
+(function(){
+  const copy=document.getElementById('hero-copy');
+  if(!copy)return;
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let queued=false;
+  function apply(){
+    queued=false;
+    const h=copy.offsetHeight||1;
+    // 0 at the top of the page, 1 once the hero has scrolled up by its own
+    // height — i.e. the effect is complete well before it nears the header,
+    // and scales naturally with viewport/text size on every screen.
+    const progress=reduce?0:Math.min(Math.max(-copy.getBoundingClientRect().top,0),h)/h;
+    copy.style.setProperty('--hero-blur',(progress*9).toFixed(2)+'px');
+    copy.style.setProperty('--hero-opacity',(1-progress*0.45).toFixed(3));
+  }
+  function onScroll(){ if(!queued){ queued=true; requestAnimationFrame(apply); } }
+  addEventListener('scroll',onScroll,{passive:true});
+  addEventListener('resize',onScroll,{passive:true});
+  apply();
+})();
 addEventListener('keydown',e=>{if(e.key==='Escape'){closeAuth();
   $('#confirm').classList.remove('open');$('#chat').classList.remove('open')}});
 

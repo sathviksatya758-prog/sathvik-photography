@@ -9,17 +9,21 @@ function logCapabilities() {
   logger.info(
     {
       redis: caps.redis ? 'on' : 'OFF (in-memory cache + inline image jobs)',
-      storage: caps.s3 ? 'S3' : 'local disk',
+      storage: caps.blob ? 'Vercel Blob' : caps.s3 ? 'S3' : 'local disk',
+      gemini: on(caps.gemini),
       anthropic: on(caps.anthropic),
       openai: on(caps.openai),
       smtp: caps.smtp ? 'on' : 'OFF (email logged, not sent)'
     },
     'service capabilities'
   );
-  if (!caps.anthropic || !caps.openai) {
+  if (!caps.gemini && !caps.anthropic) {
     logger.warn(
-      'AI keys missing — uploads still process (renditions, EXIF, palette) but captions/semantic search are degraded. Add ANTHROPIC_API_KEY / OPENAI_API_KEY to enable.'
+      'No vision AI key configured — uploads still process (renditions, EXIF, palette) but captions/chat/describe/critique run in non-AI fallback mode. Add GEMINI_API_KEY (preferred) or ANTHROPIC_API_KEY to enable.'
     );
+  }
+  if (!caps.openai) {
+    logger.warn('OPENAI_API_KEY missing — semantic search embeddings are degraded to lexical-only matching.');
   }
 }
 

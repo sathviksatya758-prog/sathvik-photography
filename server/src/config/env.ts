@@ -70,6 +70,11 @@ const EnvSchema = z.object({
 
   ANTHROPIC_API_KEY: optional(),
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-5'),
+  // Google Gemini — vision + chat provider, preferred over Anthropic when
+  // both are configured (see lib/aiProvider.ts). Get a key at
+  // https://aistudio.google.com/apikey — the free tier needs no card.
+  GEMINI_API_KEY: optional(),
+  GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
   OPENAI_API_KEY: optional(),
   EMBED_MODEL: z.string().default('text-embedding-3-small'),
 
@@ -102,6 +107,7 @@ export const caps = {
   blob: Boolean(env.BLOB_READ_WRITE_TOKEN && env.BLOB_BASE_URL),
   s3: Boolean(env.S3_BUCKET && env.S3_KEY && env.S3_SECRET),
   anthropic: Boolean(env.ANTHROPIC_API_KEY),
+  gemini: Boolean(env.GEMINI_API_KEY),
   openai: Boolean(env.OPENAI_API_KEY),
   smtp: Boolean(env.SMTP_HOST)
 } as const;

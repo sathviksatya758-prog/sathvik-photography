@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { anthropic, MODEL, extractText, parseJsonReply } from '../../lib/anthropic';
-import { caps } from '../../config/env';
+import { parseJsonReply } from '../../lib/anthropic';
+import { hasVisionAi, visionReply } from '../../lib/aiProvider';
 import type { ExifData } from '../../lib/imagePipeline';
 import type { PaletteColor } from '../../lib/imagePipeline';
 
@@ -188,30 +188,21 @@ export async function enrichPhoto(
   exif: ExifData | null,
   palette: Pick<PaletteColor, 'hex' | 'share'>[]
 ): Promise<AiMeta> {
-  if (!caps.anthropic) return fallbackAiMeta(exif, palette);
+  if (!hasVisionAi) return fallbackAiMeta(exif, palette);
 
   const context = buildContext(exif, palette);
 
-  const msg = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 3000,
-    system:
+  const text = await visionReply({
+    imageBase64,
+    mimeType: mediaType,
+    maxTokens: 3000,
+    systemPrompt:
       'You are a photography curator and critic writing exhibition catalogue metadata. ' +
       'Reply with one JSON object and nothing else. Be specific, never generic. When asked for a ' +
       'composition or quality score, give your honest expert opinion as a number — these are ' +
       'stylistic judgments, not measurements, so commit to a real answer rather than hedging.',
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType as 'image/jpeg', data: imageBase64 } },
-          { type: 'text', text: `${context}\n\nReturn JSON with keys: ${ENRICH_FIELDS}.` }
-        ]
-      }
-    ]
+    userText: `${context}\n\nReturn JSON with keys: ${ENRICH_FIELDS}.`
   });
-
-  const text = extractText(msg.content);
   return AiMeta.parse(parseJsonReply(text));
 }
 
@@ -237,29 +228,17 @@ export async function critiquePhoto(
 ): Promise<PhotoCritique> {
   const context = buildContext(exif, []);
 
-  const msg = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 1200,
-    system:
+  const text = await visionReply({
+    imageBase64,
+    mimeType: mediaType,
+    maxTokens: 1200,
+    systemPrompt:
       'You are an experienced photography instructor giving constructive, specific, technical ' +
       'feedback on a single frame. Reply with one JSON object and nothing else. Be concrete ' +
       '(reference actual regions/tones/edges in the frame), not generic encouragement.',
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType as 'image/jpeg', data: imageBase64 } },
-          {
-            type: 'text',
-            text:
-              `${context}\n\nReturn JSON with keys: exposure, compositionImprovements, ` +
-              `croppingSuggestion, whiteBalance, sharpnessFeedback, noiseAnalysis, editingRecommendations.`
-          }
-        ]
-      }
-    ]
+    userText:
+      `${context}\n\nReturn JSON with keys: exposure, compositionImprovements, ` +
+      `croppingSuggestion, whiteBalance, sharpnessFeedback, noiseAnalysis, editingRecommendations.`
   });
-
-  const text = extractText(msg.content);
   return PhotoCritique.parse(parseJsonReply(text));
 }

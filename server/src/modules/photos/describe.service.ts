@@ -2,8 +2,7 @@ import type { Photo, PhotoExif, PhotoAi, PhotoColor } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { cacheGet, cacheSet } from '../../lib/redis';
-import { caps } from '../../config/env';
-import { anthropic, MODEL, extractText } from '../../lib/anthropic';
+import { hasVisionAi, visionReply } from '../../lib/aiProvider';
 import { getObject } from '../../lib/storage';
 import { buildAiPreview } from '../../lib/imagePipeline';
 import { logger } from '../../lib/logger';
@@ -93,9 +92,10 @@ function composeFromFacts(p: PhotoWithData): string {
   return sentences.join(' ');
 }
 
-/** On-demand comprehensive description for a photo. Uses Claude vision when a
- *  key is configured (cached 24h), otherwise composes one from the real
- *  metadata. Public. */
+/** On-demand comprehensive description for a photo — "Ask AI" in the detail
+ *  view. Uses whichever vision provider is configured (Gemini preferred,
+ *  Claude as a fallback — see lib/aiProvider.ts), cached 24h, otherwise
+ *  composes one from the real metadata. Public. */
 export async function describePhoto(photoId: string): Promise<{ description: string; source: 'ai' | 'metadata' }> {
   const photo = (await prisma.photo.findFirst({
     where: { id: photoId, deletedAt: null },
@@ -103,7 +103,7 @@ export async function describePhoto(photoId: string): Promise<{ description: str
   })) as PhotoWithData | null;
   if (!photo) throw AppError.notFound('Photo not found');
 
-  if (!caps.anthropic) return { description: composeFromFacts(photo), source: 'metadata' };
+  if (!hasVisionAi) return { description: composeFromFacts(photo), source: 'metadata' };
 
   const cacheKey = `photo:describe:${photoId}`;
   const hit = await cacheGet<{ description: string; source: 'ai' | 'metadata' }>(cacheKey);
@@ -112,25 +112,18 @@ export async function describePhoto(photoId: string): Promise<{ description: str
   try {
     const original = await getObject(photo.storageKey);
     const preview = await buildAiPreview(original);
-    const msg = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 600,
-      system:
+    const description = await visionReply({
+      imageBase64: preview.toString('base64'),
+      mimeType: 'image/jpeg',
+      maxTokens: 600,
+      systemPrompt:
         'You are a photography curator writing for a gallery visitor. In one comprehensive, engaging ' +
         'paragraph (4–6 sentences), describe this photograph: what it shows, its light and mood, and any ' +
         'notable technique. Ground every technical claim in the camera data provided — never invent ' +
         'settings, places, or dates. Plain prose, no lists, no markdown.',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: preview.toString('base64') } },
-            { type: 'text', text: `Known data for this photograph:\n${factSheet(photo)}` }
-          ]
-        }
-      ]
+      userText: `Known data for this photograph:\n${factSheet(photo)}`
     });
-    const result = { description: extractText(msg.content), source: 'ai' as const };
+    const result = { description, source: 'ai' as const };
     await cacheSet(cacheKey, result, DESCRIBE_TTL);
     return result;
   } catch (err) {

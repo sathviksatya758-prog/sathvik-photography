@@ -3,7 +3,8 @@ import { AppError } from '../../lib/errors';
 import { getObject } from '../../lib/storage';
 import { buildAiPreview } from '../../lib/imagePipeline';
 import { critiquePhoto } from '../uploads/ai.service';
-import { env, caps } from '../../config/env';
+import { env } from '../../config/env';
+import { hasVisionAi, activeVisionProvider } from '../../lib/aiProvider';
 
 // On-demand only — see PhotoCritique in schema.prisma for why this isn't
 // generated automatically on upload. Cached in the DB; pass
@@ -20,8 +21,8 @@ export async function getOrGenerateCritique(photoId: string, regenerate = false)
 
   // Critique is a genuine AI call with no meaningful non-AI substitute —
   // surface a clear message rather than a 502 if no key is configured.
-  if (!caps.anthropic) {
-    throw AppError.badRequest('AI critique needs ANTHROPIC_API_KEY to be configured on the server.');
+  if (!hasVisionAi) {
+    throw AppError.badRequest('AI critique needs GEMINI_API_KEY or ANTHROPIC_API_KEY to be configured on the server.');
   }
 
   const original = await getObject(photo.storageKey);
@@ -51,9 +52,10 @@ export async function getOrGenerateCritique(photoId: string, regenerate = false)
     }
   );
 
+  const modelVersion = activeVisionProvider === 'gemini' ? env.GEMINI_MODEL : env.ANTHROPIC_MODEL;
   return prisma.photoCritique.upsert({
     where: { photoId },
-    create: { photoId, ...result, modelVersion: env.ANTHROPIC_MODEL },
-    update: { ...result, modelVersion: env.ANTHROPIC_MODEL, generatedAt: new Date() }
+    create: { photoId, ...result, modelVersion },
+    update: { ...result, modelVersion, generatedAt: new Date() }
   });
 }

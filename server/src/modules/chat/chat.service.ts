@@ -1,7 +1,9 @@
 import { prisma } from '../../lib/prisma';
 import { AppError } from '../../lib/errors';
 import { embed, toVectorLiteral } from '../../lib/embeddings';
-import { anthropic, MODEL, extractText, hasAnthropic } from '../../lib/anthropic';
+import { hasVisionAi, chatReply } from '../../lib/aiProvider';
+import { anthropic, MODEL } from '../../lib/anthropic';
+import { caps } from '../../config/env';
 import { cacheGet, cacheSet } from '../../lib/redis';
 import crypto from 'node:crypto';
 
@@ -93,18 +95,17 @@ function fallbackAnswer(liveStats: string, hits: KnowledgeRow[]): string {
   return parts.filter(Boolean).join('\n\n');
 }
 
-async function callClaude(
+async function callAi(
   history: { role: 'user' | 'assistant'; content: string }[],
   context: string,
   message: string
 ): Promise<string> {
-  const reply = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 700,
-    system: SYSTEM_PROMPT,
-    messages: [...history, { role: 'user' as const, content: `Retrieved context:\n\n${context}\n\nVisitor question: ${message}` }]
+  return chatReply({
+    systemPrompt: SYSTEM_PROMPT,
+    history,
+    maxTokens: 700,
+    userText: `Retrieved context:\n\n${context}\n\nVisitor question: ${message}`
   });
-  return extractText(reply.content);
 }
 
 export async function ask(message: string, sessionId: string | undefined, userId: string | undefined) {
@@ -130,11 +131,11 @@ export async function ask(message: string, sessionId: string | undefined, userId
   let answer: string | null = isCacheable ? await cacheGet<string>(cacheKey) : null;
   const fromCache = answer !== null;
   if (!answer) {
-    if (!hasAnthropic) {
+    if (!hasVisionAi) {
       answer = fallbackAnswer(liveStats, hits);
     } else {
       try {
-        answer = await callClaude(history, context, message);
+        answer = await callAi(history, context, message);
       } catch {
         throw AppError.badGateway('The studio assistant is unavailable right now — try again shortly.');
       }
@@ -178,9 +179,20 @@ export async function* askStream(
   const sources = hits.map((h, i) => ({ n: i + 1, title: h.title, kind: h.kind, photoId: h.photo_id }));
 
   let full = '';
-  if (!hasAnthropic) {
+  if (!hasVisionAi) {
     full = fallbackAnswer(liveStats, hits);
     yield { type: 'delta', data: full };
+  } else if (caps.gemini) {
+    // The Gemini SDK's streaming shape isn't wired up here yet, so a
+    // Gemini-configured server answers this endpoint in one shot rather
+    // than token-by-token — still arrives as a 'delta' event, just as a
+    // single one. The frontend renders it identically either way.
+    try {
+      full = await callAi(history, context, message);
+      yield { type: 'delta', data: full };
+    } catch {
+      throw AppError.badGateway('The studio assistant is unavailable right now — try again shortly.');
+    }
   } else {
     try {
       const stream = anthropic.messages.stream({

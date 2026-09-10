@@ -23,7 +23,10 @@ interface GeminiContent {
 }
 interface GeminiGenerateContentParams {
   model: string;
-  config?: { systemInstruction?: string; maxOutputTokens?: number };
+  config?: {
+    systemInstruction?: string;
+    maxOutputTokens?: number;
+  };
   contents: GeminiContent[];
 }
 export interface GeminiClient {

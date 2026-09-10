@@ -74,7 +74,12 @@ const EnvSchema = z.object({
   // both are configured (see lib/aiProvider.ts). Get a key at
   // https://aistudio.google.com/apikey — the free tier needs no card.
   GEMINI_API_KEY: optional(),
-  GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
+  // flash-lite over the flagship flash model on purpose: this app's calls
+  // (a caption, a chat reply) don't need deep reasoning, and in testing
+  // flash-lite answered in ~1-2s vs 10-30s+ (sometimes outright 503
+  // "high demand") on the bigger tier. Override if you'd rather trade
+  // speed for the flagship model's extra nuance.
+  GEMINI_MODEL: z.string().default('gemini-3.5-flash-lite'),
   OPENAI_API_KEY: optional(),
   EMBED_MODEL: z.string().default('text-embedding-3-small'),
 
